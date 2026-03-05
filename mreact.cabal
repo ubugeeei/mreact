@@ -1,0 +1,73 @@
+cabal-version:      3.0
+name:               mreact
+version:            0.1.0.0
+synopsis:           React Hooks modeled as an indexed (graded) monad in Haskell
+description:
+  A Haskell implementation of React Hooks using indexed monads (Atkey-style)
+  to enforce Rules of Hooks at the type level. The @use@ API has identity
+  index, allowing it inside control flow — exactly matching React 19 semantics.
+license:            MIT
+license-file:       LICENSE
+author:             ubugeeei
+build-type:         Simple
+extra-doc-files:    README.md
+
+flag ghcjs
+  description: Build for browser using GHCJS
+  default:     False
+  manual:      True
+
+common warnings
+  ghc-options: -Wall -Wno-unticked-promoted-constructors
+
+library
+  import:           warnings
+  default-language: GHC2021
+  hs-source-dirs:   src
+  build-depends:
+    , base         >= 4.16 && < 5
+    , containers   >= 0.6
+    , text         >= 1.2
+    , stm          >= 2.5
+    , hashable     >= 1.4
+    , unordered-containers >= 0.2
+
+  exposed-modules:
+    MReact
+    MReact.Prelude
+    MReact.Indexed
+    MReact.Types
+    MReact.Hooks
+    MReact.Hooks.State
+    MReact.Hooks.Effect
+    MReact.Hooks.Ref
+    MReact.Hooks.Memo
+    MReact.Hooks.Context
+    MReact.Hooks.Async
+    MReact.Hooks.Transition
+    MReact.Hooks.Id
+    MReact.Component
+    MReact.VDOM
+    MReact.VDOM.Diff
+    MReact.DOM
+    MReact.Runtime.Fiber
+    MReact.Runtime.Scheduler
+    MReact.Browser
+
+  if flag(ghcjs)
+    cpp-options: -DGHCJS
+
+executable mreact-demo
+  import:           warnings
+  default-language: GHC2021
+  hs-source-dirs:   app
+  main-is:          Main.hs
+  build-depends:
+    , base          >= 4.16 && < 5
+    , mreact
+    , text          >= 1.2
+    , containers    >= 0.6
+
+  other-modules:
+    Examples.Counter
+    Examples.TodoApp
