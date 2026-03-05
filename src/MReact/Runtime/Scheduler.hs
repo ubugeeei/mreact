@@ -18,7 +18,7 @@
 --
 -- Because:
 --   1. @render(s)@ is deterministic for the same state @s@
---   2. @reconcile@ produces no patches when old == new VDOM
+--   2. @reconcile@ produces no patches when old == new fiber tree
 --   3. @commit@ with no patches is a no-op
 --
 -- Therefore applying the same state twice produces the same DOM as once.
@@ -45,8 +45,8 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import MReact.Types
 import MReact.Hooks (Hooks(..))
-import MReact.VDOM
-import MReact.VDOM.Diff
+import MReact.Fiber
+import MReact.Fiber.Diff
 import MReact.Runtime.Fiber
 
 --------------------------------------------------------------------------------
@@ -55,22 +55,22 @@ import MReact.Runtime.Fiber
 
 -- | A mounted application — the result of mounting a root component.
 data MountedApp = MountedApp
-  { appFiber      :: !Fiber
+  { appFiber      :: !FiberInstance
   , appRenderCtx  :: !(IORef RenderCtx)
   , appPatches    :: !(IORef [Patch])     -- ^ Last computed patches
   , appCommit     :: [Patch] -> IO ()     -- ^ Backend-specific commit function
   }
 
--- | Mount a root component, creating the Fiber and performing the initial render.
+-- | Mount a root component, creating the FiberInstance and performing the initial render.
 mount :: ([Patch] -> IO ())      -- ^ Commit function (applies patches to real DOM)
       -> RenderCtx               -- ^ Initial context values
-      -> Hooks '[] j VNode       -- ^ Root component (already applied to props)
+      -> Hooks '[] j Fiber       -- ^ Root component (already applied to props)
       -> IO MountedApp
 mount commitFn ctx component = do
   ctxRef <- newIORef ctx
   patchRef <- newIORef []
   updateRef <- newIORef (pure () :: IO ())
-  fiber <- newFiber (readIORef updateRef >>= id)
+  fiber <- newFiberInstance (readIORef updateRef >>= id)
   let app = MountedApp fiber ctxRef patchRef commitFn
   writeIORef updateRef (performUpdate app)
   -- Initial render
@@ -83,20 +83,20 @@ mount commitFn ctx component = do
 -- Rendering pipeline: u_s = commit . reconcile . render(s)
 --------------------------------------------------------------------------------
 
--- | Step 1: Render — interpret the Hooks GADT, producing VDOM.
+-- | Step 1: Render — interpret the Hooks GADT, producing a fiber tree.
 -- This is the effect handler that resolves all hook operations.
-render :: Fiber -> RenderCtx -> Hooks i j VNode -> IO VNode
+render :: FiberInstance -> RenderCtx -> Hooks i j Fiber -> IO Fiber
 render fiber ctx hooks = do
   resetCursor fiber
   interpret fiber ctx hooks
 
--- | Step 2: Reconcile — diff old VDOM against new VDOM, producing patches.
+-- | Step 2: Reconcile — diff old fiber tree against new, producing patches.
 -- When old == new (same state), this returns @[]@ — no patches.
-reconcile :: Fiber -> VNode -> IO [Patch]
-reconcile fiber newVDOM = do
-  oldVDOM <- readIORef (fiberPrevVDOM fiber)
-  let patches = diff oldVDOM newVDOM
-  writeIORef (fiberPrevVDOM fiber) newVDOM
+reconcile :: FiberInstance -> Fiber -> IO [Patch]
+reconcile fiber newTree = do
+  oldTree <- readIORef (fiberPrevTree fiber)
+  let patches = diff oldTree newTree
+  writeIORef (fiberPrevTree fiber) newTree
   pure patches
 
 -- | Step 3: Commit — apply patches to the real DOM.
@@ -116,11 +116,11 @@ commit app patches = do
 -- Idempotency: u_s(u_s(DOM)) = u_s(DOM)
 --
 -- Proof sketch:
---   Let vdom1 = render(s).  patches1 = reconcile(vdom_old, vdom1).
---   After commit(patches1), DOM reflects vdom1.
+--   Let tree1 = render(s).  patches1 = reconcile(tree_old, tree1).
+--   After commit(patches1), DOM reflects tree1.
 --   Now apply u_s again:
---     vdom2 = render(s).  Since s hasn't changed, vdom2 ≡ vdom1 (structurally).
---     patches2 = reconcile(vdom1, vdom2) = [] (no diff).
+--     tree2 = render(s).  Since s hasn't changed, tree2 ≡ tree1 (structurally).
+--     patches2 = reconcile(tree1, tree2) = [] (no diff).
 --     commit([]) is a no-op.
 --   Therefore u_s(u_s(DOM)) = u_s(DOM). ∎
 performUpdate :: MountedApp -> IO ()
@@ -130,7 +130,7 @@ performUpdate app = do
   pure ()
 
 -- | Run effects of the specified phase.
-runEffects :: EffectPhase -> Fiber -> IO ()
+runEffects :: EffectPhase -> FiberInstance -> IO ()
 runEffects phase fiber = do
   entries <- readIORef (fiberEffects fiber)
   let matching = filter (\e -> effectPhase e == phase) entries
@@ -152,8 +152,8 @@ runEffects phase fiber = do
 -- a handler in an algebraic effects system.
 --------------------------------------------------------------------------------
 
--- | Interpret a Hooks computation, resolving all effects against the Fiber.
-interpret :: forall i j a. Fiber -> RenderCtx -> Hooks i j a -> IO a
+-- | Interpret a Hooks computation, resolving all effects against the FiberInstance.
+interpret :: forall i j a. FiberInstance -> RenderCtx -> Hooks i j a -> IO a
 
 interpret _fiber _ctx (HPure a) = pure a
 
@@ -350,16 +350,6 @@ interpret fiber _ctx HTransition = do
       pure (unsafeCoerce stored)
 
 -- useDeferredValue: return (potentially stale) value
---
--- React semantics:
---   - Initial render: return the provided value
---   - Re-render with new value: return the OLD value first (stale),
---     then schedule a background re-render where the new value is committed
---
--- This uses a (value, IORef Bool) pair in the hook store:
---   - The Bool flag tracks whether the next render is the "deferred" re-render
---   - Urgent render: return old, set flag, schedule re-render
---   - Deferred render: commit new value, clear flag
 interpret fiber _ctx (HDeferred val) = do
   cursor <- readIORef (fiberCursor fiber)
   modifyIORef' (fiberCursor fiber) (+ 1)
@@ -399,12 +389,12 @@ interpret fiber _ctx (HUse async') = do
       throwIO SuspendException
 
 -- suspense: catch SuspendException from child use calls
--- When the child suspends, return the fallback VNode.
--- When the child completes normally, return the child's VNode.
+-- When the child suspends, return the fallback Fiber.
+-- When the child completes normally, return the child's Fiber.
 interpret fiber ctx (HSuspense fallbackNode child) =
   catch (interpret fiber ctx child) handler
   where
-    handler :: SuspendException -> IO VNode
+    handler :: SuspendException -> IO Fiber
     handler SuspendException = pure fallbackNode
 
 --------------------------------------------------------------------------------

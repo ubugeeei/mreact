@@ -34,10 +34,10 @@
 -- * "MReact.Hooks.Transition" — @useTransition@, @useDeferredValue@ documentation
 -- * "MReact.Hooks.Id" — @useId@ documentation
 -- * "MReact.Component" — @Component@, @FC@, @StatelessFC@ type aliases
--- * "MReact.VDOM" — Virtual DOM types
--- * "MReact.VDOM.Diff" — VDOM diffing algorithm
+-- * "MReact.Fiber" — Fiber node types
+-- * "MReact.Fiber.Diff" — Fiber tree diffing algorithm
 -- * "MReact.DOM" — HTML element DSL (JSX equivalent)
--- * "MReact.Runtime.Fiber" — Fiber data structure
+-- * "MReact.Runtime.Fiber" — FiberInstance data structure
 -- * "MReact.Runtime.Scheduler" — Render pipeline & interpreter
 -- * "MReact.Browser" — Browser backend (GHCJS) & SSR
 module MReact
@@ -49,9 +49,9 @@ module MReact
   , module MReact.Hooks
     -- * Components
   , module MReact.Component
-    -- * VDOM
-  , module MReact.VDOM
-  , module MReact.VDOM.Diff
+    -- * Fiber
+  , module MReact.Fiber
+  , module MReact.Fiber.Diff
     -- * DOM DSL
   , module MReact.DOM
     -- * Runtime
@@ -65,8 +65,8 @@ import MReact.Indexed
 import MReact.Types
 import MReact.Hooks
 import MReact.Component
-import MReact.VDOM
-import MReact.VDOM.Diff
+import MReact.Fiber
+import MReact.Fiber.Diff
 import MReact.DOM
 import MReact.Runtime.Fiber
 import MReact.Runtime.Scheduler

@@ -11,13 +11,13 @@
 -- of a conditional will have matching indices:
 --
 -- @
--- -- Valid: both branches are Hooks i i VDOM
+-- -- Valid: both branches are Hooks i i Fiber
 -- if showDetails
 --   then do
 --     details <- use fetchDetails   -- Hooks i i String
---     return (text_ details)        -- Hooks i i VDOM
+--     return (text_ details)        -- Hooks i i Fiber
 --   else
---     return nullElem               -- Hooks i i VDOM
+--     return nullElem               -- Hooks i i Fiber
 -- @
 --
 -- == Suspension
@@ -25,7 +25,7 @@
 -- When @use@ encounters a 'Pending' 'Async', the interpreter throws
 -- a 'SuspendException'. This is caught by the nearest 'Suspense'
 -- boundary (created via @suspense@), which renders the fallback
--- VDOM until the async resolves.
+-- Fiber until the async resolves.
 --
 -- @
 -- myComponent () = do
@@ -42,8 +42,8 @@
 -- @
 -- -- Type error: 'SState Int ': i /= i
 -- if cond
---   then do { (n, _) <- useState 0; ... }   -- Hooks i ('SState Int ': i) VDOM
---   else return nullElem                      -- Hooks i i VDOM
+--   then do { (n, _) <- useState 0; ... }   -- Hooks i ('SState Int ': i) Fiber
+--   else return nullElem                      -- Hooks i i Fiber
 -- @
 --
 -- This encoding directly captures the insight from the discussion:

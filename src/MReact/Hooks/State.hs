@@ -37,8 +37,8 @@ module MReact.Hooks.State
 -- @
 -- -- Won't compile: branches have different indices
 -- if cond
---   then do { (s, _) <- useState 0; ... }  -- Hooks i ('SState Int ': i) VDOM
---   else return nullElem                     -- Hooks i i VDOM
+--   then do { (s, _) <- useState 0; ... }  -- Hooks i ('SState Int ': i) Fiber
+--   else return nullElem                     -- Hooks i i Fiber
 -- @
 useState :: ()
 useState = ()

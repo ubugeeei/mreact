@@ -9,11 +9,13 @@
 -- @
 -- {-\# LANGUAGE RebindableSyntax \#-}
 -- {-\# LANGUAGE DataKinds \#-}
+-- {-\# LANGUAGE PartialTypeSignatures \#-}
+-- {-\# OPTIONS_GHC -Wno-partial-type-signatures \#-}
 -- module MyComponent where
 --
 -- import MReact.Prelude
 --
--- counter :: FC '[] '[ 'SState Int] ()
+-- counter :: FC _ ()
 -- counter () = do
 --   (count, setCount) <- useState 0
 --   return $ div []
@@ -65,9 +67,11 @@ module MReact.Prelude
     -- * Re-exports: Component types (includes suspense)
   , module MReact.Component
 
-    -- * Re-exports: VDOM
-  , VNode(..)
-  , vdomEq
+    -- * Re-exports: Fiber
+  , Fiber(..)
+  , fiberEq
+  , DOMEvent(..)
+  , EventHandler
 
     -- * Re-exports: OverloadedStrings support
   , IsString(..)
@@ -86,7 +90,7 @@ import qualified Prelude
 import MReact.Types
 import MReact.Hooks (Hooks(..))
 import MReact.Component
-import MReact.VDOM (VNode(..), vdomEq)
+import MReact.Fiber (Fiber(..), fiberEq, DOMEvent(..), EventHandler)
 import Data.String (IsString(..))
 import MReact.DOM
 

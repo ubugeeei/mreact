@@ -8,14 +8,14 @@ import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 
 import MReact.Types (async, resolve)
-import MReact.VDOM
-import MReact.VDOM.Diff
+import MReact.Fiber
+import MReact.Fiber.Diff
 import MReact.Runtime.Fiber
 import MReact.Runtime.Scheduler (render, reconcile, runEffects)
 
-import Examples.Counter (counterApp)
-import Examples.TodoApp (todoAppWithAsync, Todo(..))
-import Examples.DeferredValue (deferredApp)
+import Counter (counterApp)
+import TodoApp (todoAppWithAsync, Todo(..))
+import DeferredValue (deferredApp)
 
 --------------------------------------------------------------------------------
 -- ANSI escape codes
@@ -40,15 +40,15 @@ blue    = fg 4
 gray    = fg 242
 
 --------------------------------------------------------------------------------
--- VDOM event handler extraction
+-- Fiber event handler extraction
 --------------------------------------------------------------------------------
 
-findClickHandler :: String -> VNode -> Maybe EventHandler
-findClickHandler label (VElement "button" _ events [VText t])
+findClickHandler :: String -> Fiber -> Maybe EventHandler
+findClickHandler label (FElement "button" _ events [FText t])
   | t == label = Map.lookup "click" events
-findClickHandler label (VElement _ _ _ children) =
+findClickHandler label (FElement _ _ _ children) =
   foldr (\c acc -> case acc of Just _ -> acc; Nothing -> findClickHandler label c) Nothing children
-findClickHandler label (VFragment children) =
+findClickHandler label (FFragment children) =
   foldr (\c acc -> case acc of Just _ -> acc; Nothing -> findClickHandler label c) Nothing children
 findClickHandler _ _ = Nothing
 
@@ -59,18 +59,18 @@ dummyEvent = DOMEvent "click" ""
 -- Pretty printing
 --------------------------------------------------------------------------------
 
--- | Syntax-highlighted compact VDOM.
-showVDOM :: VNode -> String
-showVDOM (VText s) = s
-showVDOM (VElement tag _ _ children) =
+-- | Syntax-highlighted compact fiber tree.
+showFiber :: Fiber -> String
+showFiber (FText s) = s
+showFiber (FElement tag _ _ children) =
   dim ++ "<" ++ reset ++ cyan ++ tag ++ reset ++ dim ++ ">" ++ reset
-  ++ concatMap showVDOM children
+  ++ concatMap showFiber children
   ++ dim ++ "</" ++ reset ++ cyan ++ tag ++ reset ++ dim ++ ">" ++ reset
-showVDOM (VFragment children) = concatMap showVDOM children
-showVDOM VNull = dim ++ "null" ++ reset
-showVDOM (VKeyed tag _ _ children) =
+showFiber (FFragment children) = concatMap showFiber children
+showFiber FNull = dim ++ "null" ++ reset
+showFiber (FKeyed tag _ _ children) =
   dim ++ "<" ++ reset ++ cyan ++ tag ++ reset ++ dim ++ ">" ++ reset
-  ++ concatMap (showVDOM . snd) children
+  ++ concatMap (showFiber . snd) children
   ++ dim ++ "</" ++ reset ++ cyan ++ tag ++ reset ++ dim ++ ">" ++ reset
 
 showPatch :: Patch -> String
@@ -113,15 +113,15 @@ main = do
   putStrLn $ dim ++ "  ─────────────────────────────────────" ++ reset
   putStrLn ""
 
-  fiber <- newFiber (pure ())
+  fiber <- newFiberInstance (pure ())
 
   -- Step 0: Initial render
   stepHeader 0 "Initial render"
-  vdom0 <- render fiber newRenderCtx (counterApp ())
-  writeIORef (fiberPrevVDOM fiber) vdom0
+  tree0 <- render fiber newRenderCtx (counterApp ())
+  writeIORef (fiberPrevTree fiber) tree0
   writeIORef (fiberIsFirstRender fiber) False
   phase ">" cyan "render"
-  putStrLn $ "    " ++ showVDOM vdom0
+  putStrLn $ "    " ++ showFiber tree0
   phase ">" magenta "effect"
   runEffects PassiveEffect fiber
   writeIORef (fiberEffects fiber) []
@@ -130,7 +130,7 @@ main = do
   -- Step 1-4: Simulate clicks
   let clicks = [(1, "+"), (2, "+"), (3, "-"), (4, "Reset")]
   mapM_ (\(n, label) -> do
-    prev <- readIORef (fiberPrevVDOM fiber)
+    prev <- readIORef (fiberPrevTree fiber)
     stepHeader n ("Click " ++ show label)
     simulateClick fiber label prev
     ) clicks
@@ -138,11 +138,11 @@ main = do
   -- Step 5: Idempotency proof
   stepHeader 5 "Re-render (same state)"
   phase "\x21bb" dim "no state change"
-  vdom5 <- render fiber newRenderCtx (counterApp ())
+  tree5 <- render fiber newRenderCtx (counterApp ())
   writeIORef (fiberEffects fiber) []
-  patches5 <- reconcile fiber vdom5
+  patches5 <- reconcile fiber tree5
   phase ">" cyan "render"
-  putStrLn $ "    " ++ showVDOM vdom5
+  putStrLn $ "    " ++ showFiber tree5
   phase ">" yellow "reconcile"
   showPatches patches5
   putStrLn ""
@@ -179,28 +179,28 @@ suspenseDemo = do
   -- Already-resolved Async
   stepHeader 6 "Suspense with resolved Async"
   resolvedAsync <- resolve [Todo 0 "Buy milk" False, Todo 1 "Write code" True]
-  fiber6 <- newFiber (pure ())
-  vdom6 <- render fiber6 newRenderCtx (todoAppWithAsync resolvedAsync ())
+  fiber6 <- newFiberInstance (pure ())
+  tree6 <- render fiber6 newRenderCtx (todoAppWithAsync resolvedAsync ())
   phase ">" cyan "render (resolved → no suspension)"
-  putStrLn $ "    " ++ showVDOM vdom6
+  putStrLn $ "    " ++ showFiber tree6
   putStrLn ""
 
   -- Pending Async (demonstrates fallback)
   stepHeader 7 "Suspense with pending Async"
   pendingAsync <- async (threadDelay 1000000 >> pure [Todo 0 "Fetched item" False])
-  fiber7 <- newFiber (pure ())
-  vdom7 <- render fiber7 newRenderCtx (todoAppWithAsync pendingAsync ())
+  fiber7 <- newFiberInstance (pure ())
+  tree7 <- render fiber7 newRenderCtx (todoAppWithAsync pendingAsync ())
   phase ">" cyan "render (pending → shows fallback)"
-  putStrLn $ "    " ++ showVDOM vdom7
+  putStrLn $ "    " ++ showFiber tree7
   putStrLn ""
 
   -- Wait for resolution and re-render
   stepHeader 8 "After Async resolves → re-render"
   threadDelay 1200000  -- wait for async to resolve
-  fiber8 <- newFiber (pure ())
-  vdom8 <- render fiber8 newRenderCtx (todoAppWithAsync pendingAsync ())
+  fiber8 <- newFiberInstance (pure ())
+  tree8 <- render fiber8 newRenderCtx (todoAppWithAsync pendingAsync ())
   phase ">" cyan "render (resolved → shows content)"
-  putStrLn $ "    " ++ showVDOM vdom8
+  putStrLn $ "    " ++ showFiber tree8
   putStrLn ""
 
   -- useDeferredValue demo
@@ -215,36 +215,36 @@ deferredValueDemo = do
 
   -- Initial render
   stepHeader 9 "Initial render (query = \"\")"
-  fiber <- newFiber (pure ())
-  vdom9 <- render fiber newRenderCtx (deferredApp ())
-  writeIORef (fiberPrevVDOM fiber) vdom9
+  fiber <- newFiberInstance (pure ())
+  tree9 <- render fiber newRenderCtx (deferredApp ())
+  writeIORef (fiberPrevTree fiber) tree9
   writeIORef (fiberIsFirstRender fiber) False
   phase ">" cyan "render"
-  putStrLn $ "    " ++ showVDOM vdom9
+  putStrLn $ "    " ++ showFiber tree9
   putStrLn ""
 
   -- Simulate typing "abc" — setState triggers re-render
   stepHeader 10 "Type \"abc\" → urgent render returns stale deferred"
   -- Find the input handler and simulate
-  let setQuery = findClickHandler "search" vdom9
+  let setQuery = findClickHandler "search" tree9
   case setQuery of
     Just handler -> do
       handler (DOMEvent "click" "abc")
       -- Urgent re-render: useDeferredValue returns OLD value
-      vdom10 <- render fiber newRenderCtx (deferredApp ())
-      patches10 <- reconcile fiber vdom10
+      tree10 <- render fiber newRenderCtx (deferredApp ())
+      patches10 <- reconcile fiber tree10
       phase ">" cyan "render (urgent: deferred still stale)"
-      putStrLn $ "    " ++ showVDOM vdom10
+      putStrLn $ "    " ++ showFiber tree10
       phase ">" yellow "reconcile"
       showPatches patches10
       putStrLn ""
 
       -- Deferred re-render: useDeferredValue now returns NEW value
       stepHeader 11 "Deferred re-render → deferred catches up"
-      vdom11 <- render fiber newRenderCtx (deferredApp ())
-      patches11 <- reconcile fiber vdom11
+      tree11 <- render fiber newRenderCtx (deferredApp ())
+      patches11 <- reconcile fiber tree11
       phase ">" cyan "render (deferred: value updated)"
-      putStrLn $ "    " ++ showVDOM vdom11
+      putStrLn $ "    " ++ showFiber tree11
       phase ">" yellow "reconcile"
       showPatches patches11
       putStrLn ""
@@ -256,19 +256,19 @@ stepHeader :: Int -> String -> IO ()
 stepHeader n title = do
   putStrLn $ bold ++ "  [" ++ show n ++ "] " ++ title ++ reset
 
-simulateClick :: Fiber -> String -> VNode -> IO ()
-simulateClick fiber label currentVDOM = do
-  case findClickHandler label currentVDOM of
+simulateClick :: FiberInstance -> String -> Fiber -> IO ()
+simulateClick fiber label currentTree = do
+  case findClickHandler label currentTree of
     Nothing -> putStrLn $ red ++ "  ERROR: no handler for \"" ++ label ++ "\"" ++ reset
     Just handler -> do
       phase "\x25b6" green ("click \"" ++ label ++ "\"")
       handler dummyEvent
 
-      newVDOM <- render fiber newRenderCtx (counterApp ())
+      newTree <- render fiber newRenderCtx (counterApp ())
       phase ">" cyan "render"
-      putStrLn $ "    " ++ showVDOM newVDOM
+      putStrLn $ "    " ++ showFiber newTree
 
-      patches <- reconcile fiber newVDOM
+      patches <- reconcile fiber newTree
       phase ">" yellow "reconcile"
       showPatches patches
 

@@ -34,7 +34,7 @@ module MReact.Hooks
 
 import MReact.Indexed
 import MReact.Types
-import MReact.VDOM (VNode)
+import MReact.Fiber (Fiber)
 
 import MReact.Hooks.State
 import MReact.Hooks.Effect
@@ -48,7 +48,7 @@ import MReact.Hooks.Id
 -- | The indexed free monad for React Hooks.
 --
 -- This is the "effectful computation" from the blog post:
---   Component : Props -> R(VDOM)
+--   Component : Props -> R(Fiber)
 --
 -- The GADT constructors correspond to algebraic effect operations,
 -- and the runtime interpreter ('MReact.Runtime.Scheduler') is
@@ -123,10 +123,10 @@ data Hooks i j a where
   -- hook slots, so they may appear inside control flow.
   --
   -- When the child computation throws 'SuspendException' (because
-  -- a @use@ encountered a 'Pending' async), the fallback 'VNode'
+  -- a @use@ encountered a 'Pending' async), the fallback 'Fiber'
   -- is returned instead. Once the async resolves, a re-render is
   -- scheduled and the child renders normally.
-  HSuspense :: VNode -> Hooks i i VNode -> Hooks i i VNode
+  HSuspense :: Fiber -> Hooks i i Fiber -> Hooks i i Fiber
 
 instance IxFunctor Hooks where
   imap = HMap

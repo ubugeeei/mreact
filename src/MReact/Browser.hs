@@ -32,9 +32,8 @@ module MReact.Browser
 import Data.IORef
 import qualified Data.Map.Strict as Map
 import MReact.Hooks (Hooks)
-import MReact.Types (Slot)
-import MReact.VDOM
-import MReact.VDOM.Diff
+import MReact.Fiber
+import MReact.Fiber.Diff
 import MReact.Runtime.Fiber
 import MReact.Runtime.Scheduler
 
@@ -45,7 +44,7 @@ import MReact.Runtime.Scheduler
 -- | Handle to the real DOM root element.
 data DOMHandle = DOMHandle
   { domRootId   :: !String
-  , domVDOM     :: !(IORef VNode)   -- ^ Current VDOM state
+  , domTree     :: !(IORef Fiber)   -- ^ Current fiber tree state
 #ifdef GHCJS
   , domElement  :: !JSVal           -- ^ JS DOM element reference
 #endif
@@ -54,12 +53,12 @@ data DOMHandle = DOMHandle
 -- | Create a handle to a DOM root element by its ID.
 createDOMHandle :: String -> IO DOMHandle
 createDOMHandle rootId = do
-  vdomRef <- newIORef VNull
+  treeRef <- newIORef FNull
 #ifdef GHCJS
   el <- js_getElementById rootId
-  pure (DOMHandle rootId vdomRef el)
+  pure (DOMHandle rootId treeRef el)
 #else
-  pure (DOMHandle rootId vdomRef)
+  pure (DOMHandle rootId treeRef)
 #endif
 
 --------------------------------------------------------------------------------
@@ -72,7 +71,7 @@ createDOMHandle rootId = do
 -- main = mountApp "root" myComponent myProps
 -- @
 mountApp :: String                   -- ^ DOM element ID
-         -> (props -> Hooks '[] j VNode)  -- ^ Component
+         -> (props -> Hooks '[] j Fiber)  -- ^ Component
          -> props                    -- ^ Initial props
          -> IO MountedApp
 mountApp rootId component props = do
@@ -81,7 +80,7 @@ mountApp rootId component props = do
 
 -- | Mount with an explicit DOM handle.
 mountAppWith :: DOMHandle
-             -> (props -> Hooks '[] j VNode)
+             -> (props -> Hooks '[] j Fiber)
              -> props
              -> IO MountedApp
 mountAppWith domHandle component props = do
@@ -102,8 +101,8 @@ applyPatchesToDOM handle patches = do
   -- GHC backend: log patches for testing/debugging
   putStrLn $ "[MReact] Applying " ++ show (length patches) ++ " patches:"
   mapM_ (putStrLn . ("  " ++) . showPatch) patches
-  -- Update internal VDOM state
-  modifyIORef' (domVDOM handle) (applyPatchesVDOM patches)
+  -- Update internal fiber tree state
+  modifyIORef' (domTree handle) (applyPatchesFiber patches)
 #endif
 
 -- | Pretty-print a patch for the logging backend.
@@ -115,27 +114,27 @@ showPatch (PText path t)       = "TEXT at " ++ show path ++ " = " ++ show t
 showPatch (PAttrs path as)     = "ATTRS at " ++ show path ++ " (" ++ show (length as) ++ " changes)"
 showPatch (PReorder path _)    = "REORDER at " ++ show path
 
--- | Apply patches to a VDOM tree (for the GHC testing backend).
-applyPatchesVDOM :: [Patch] -> VNode -> VNode
-applyPatchesVDOM [] vdom = vdom
-applyPatchesVDOM (p:ps) vdom = applyPatchesVDOM ps (applyOneVDOM p vdom)
+-- | Apply patches to a fiber tree (for the GHC testing backend).
+applyPatchesFiber :: [Patch] -> Fiber -> Fiber
+applyPatchesFiber [] tree = tree
+applyPatchesFiber (p:ps) tree = applyPatchesFiber ps (applyOneFiber p tree)
 
-applyOneVDOM :: Patch -> VNode -> VNode
-applyOneVDOM (PReplace [] new)     _    = new
-applyOneVDOM (PText [] t)          _    = VText t
-applyOneVDOM (PAttrs [] changes) (VElement tag attrs evts children) =
-  VElement tag (foldl applyAttrPatch attrs changes) evts children
-applyOneVDOM (PReplace (i:rest) new) (VElement tag attrs evts children) =
-  VElement tag attrs evts (modifyChild i (applyOneVDOM (PReplace rest new)) children)
-applyOneVDOM (PText (i:rest) t) (VElement tag attrs evts children) =
-  VElement tag attrs evts (modifyChild i (applyOneVDOM (PText rest t)) children)
-applyOneVDOM _ vdom = vdom  -- Simplified: other cases
+applyOneFiber :: Patch -> Fiber -> Fiber
+applyOneFiber (PReplace [] new)     _    = new
+applyOneFiber (PText [] t)          _    = FText t
+applyOneFiber (PAttrs [] changes) (FElement tag attrs evts children) =
+  FElement tag (foldl applyAttrPatch attrs changes) evts children
+applyOneFiber (PReplace (i:rest) new) (FElement tag attrs evts children) =
+  FElement tag attrs evts (modifyChild i (applyOneFiber (PReplace rest new)) children)
+applyOneFiber (PText (i:rest) t) (FElement tag attrs evts children) =
+  FElement tag attrs evts (modifyChild i (applyOneFiber (PText rest t)) children)
+applyOneFiber _ tree = tree  -- Simplified: other cases
 
 applyAttrPatch :: Attrs -> AttrPatch -> Attrs
 applyAttrPatch attrs (SetAttr k v)  = Map.insert k v attrs
 applyAttrPatch attrs (RemoveAttr k) = Map.delete k attrs
 
-modifyChild :: Int -> (VNode -> VNode) -> [VNode] -> [VNode]
+modifyChild :: Int -> (Fiber -> Fiber) -> [Fiber] -> [Fiber]
 modifyChild _ _ [] = []
 modifyChild 0 f (x:xs) = f x : xs
 modifyChild n f (x:xs) = x : modifyChild (n-1) f xs
@@ -163,26 +162,26 @@ eventLoop _app = do
 -- | Render a component to an HTML string (for SSR).
 --
 -- This is the server effect handler:
--- @handleServer : Eff_React(VDOM) -> HTML string@
-renderToString :: Hooks '[] j VNode -> IO String
+-- @handleServer : Eff_React(Fiber) -> HTML string@
+renderToString :: Hooks '[] j Fiber -> IO String
 renderToString component = do
-  fiber <- newFiber (pure ())
-  vdom <- interpret fiber newRenderCtx component
-  pure (vdomToHTML vdom)
+  fiber <- newFiberInstance (pure ())
+  tree <- interpret fiber newRenderCtx component
+  pure (fiberToHTML tree)
 
--- | Convert VDOM to HTML string.
-vdomToHTML :: VNode -> String
-vdomToHTML (VText s) = escapeHTML s
-vdomToHTML (VElement tag attrs _ children) =
+-- | Convert a fiber tree to HTML string.
+fiberToHTML :: Fiber -> String
+fiberToHTML (FText s) = escapeHTML s
+fiberToHTML (FElement tag attrs _ children) =
   "<" ++ tag ++ renderAttrs attrs ++ ">"
-  ++ concatMap vdomToHTML children
+  ++ concatMap fiberToHTML children
   ++ "</" ++ tag ++ ">"
-vdomToHTML (VKeyed tag attrs _ children) =
+fiberToHTML (FKeyed tag attrs _ children) =
   "<" ++ tag ++ renderAttrs attrs ++ ">"
-  ++ concatMap (vdomToHTML . snd) children
+  ++ concatMap (fiberToHTML . snd) children
   ++ "</" ++ tag ++ ">"
-vdomToHTML (VFragment children) = concatMap vdomToHTML children
-vdomToHTML VNull = ""
+fiberToHTML (FFragment children) = concatMap fiberToHTML children
+fiberToHTML FNull = ""
 
 renderAttrs :: Attrs -> String
 renderAttrs attrs
@@ -260,7 +259,7 @@ applyPatchJS root (PReplace path new) = do
   parent <- navigateToParent root path
   let idx = last path
   oldChild <- js_childAt parent idx
-  newEl <- vdomToDOM new
+  newEl <- fiberToDOM new
   js_replaceChild parent newEl oldChild
 
 applyPatchJS root (PText path txt) = do
@@ -279,7 +278,7 @@ applyPatchJS root (PRemove path) = do
 
 applyPatchJS root (PInsert path idx new) = do
   parent <- navigateTo root path
-  newEl <- vdomToDOM new
+  newEl <- fiberToDOM new
   js_appendChild parent newEl
 
 applyPatchJS _ _ = pure ()
@@ -297,20 +296,20 @@ navigateTo el (i:is) = do
 navigateToParent :: JSVal -> Path -> IO JSVal
 navigateToParent el path = navigateTo el (init path)
 
--- | Convert a VNode to a real DOM element.
-vdomToDOM :: VNode -> IO JSVal
-vdomToDOM (VText s) = js_createTextNode s
-vdomToDOM (VElement tag attrs events children) = do
+-- | Convert a Fiber to a real DOM element.
+fiberToDOM :: Fiber -> IO JSVal
+fiberToDOM (FText s) = js_createTextNode s
+fiberToDOM (FElement tag attrs events children) = do
   el <- js_createElement tag
   mapM_ (\(k,v) -> js_setAttribute el k v) (Map.toList attrs)
   -- Event binding would go here
-  mapM_ (\child -> vdomToDOM child >>= js_appendChild el) children
+  mapM_ (\child -> fiberToDOM child >>= js_appendChild el) children
   pure el
-vdomToDOM (VFragment children) = do
+fiberToDOM (FFragment children) = do
   frag <- js_createElement "div"  -- Simplified
-  mapM_ (\child -> vdomToDOM child >>= js_appendChild frag) children
+  mapM_ (\child -> fiberToDOM child >>= js_appendChild frag) children
   pure frag
-vdomToDOM VNull = js_createTextNode ""
-vdomToDOM (VKeyed tag attrs events children) =
-  vdomToDOM (VElement tag attrs events (map snd children))
+fiberToDOM FNull = js_createTextNode ""
+fiberToDOM (FKeyed tag attrs events children) =
+  fiberToDOM (FElement tag attrs events (map snd children))
 #endif

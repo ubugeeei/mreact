@@ -10,8 +10,8 @@
 --   ]
 -- @
 --
--- Elements follow the pattern: @tag :: [Prop] -> [VNode] -> VNode@
--- Void elements: @tag :: [Prop] -> VNode@
+-- Elements follow the pattern: @tag :: [Prop] -> [Fiber] -> Fiber@
+-- Void elements: @tag :: [Prop] -> Fiber@
 --
 -- Props named @class_@, @type_@, and @id_@ keep the trailing underscore
 -- to avoid conflicts with Haskell keywords or Prelude.
@@ -115,7 +115,7 @@ module MReact.DOM
 
 import Prelude hiding (div, span, id, head, map, pred)
 import qualified Data.Map.Strict as Map
-import MReact.VDOM
+import MReact.Fiber
 
 --------------------------------------------------------------------------------
 -- Prop type
@@ -266,160 +266,160 @@ key = KeyProp
 -- h1 [] ["Hello"]                          -- string literal
 -- p  [] [text ("Count: " ++ show count)]   -- dynamic string
 -- @
-text :: String -> VNode
-text = VText
+text :: String -> Fiber
+text = FText
 
 --------------------------------------------------------------------------------
 -- Element helpers
 --------------------------------------------------------------------------------
 
-mkElement :: String -> [Prop] -> [VNode] -> VNode
+mkElement :: String -> [Prop] -> [Fiber] -> Fiber
 mkElement tag props children =
   let (attrs, events, _mkey) = toAttrsAndEvents props
-  in VElement tag attrs events children
+  in FElement tag attrs events children
 
-mkVoid :: String -> [Prop] -> VNode
+mkVoid :: String -> [Prop] -> Fiber
 mkVoid tag props =
   let (attrs, events, _mkey) = toAttrsAndEvents props
-  in VElement tag attrs events []
+  in FElement tag attrs events []
 
 -- Layout
-div :: [Prop] -> [VNode] -> VNode
+div :: [Prop] -> [Fiber] -> Fiber
 div = mkElement "div"
 
-span :: [Prop] -> [VNode] -> VNode
+span :: [Prop] -> [Fiber] -> Fiber
 span = mkElement "span"
 
-p :: [Prop] -> [VNode] -> VNode
+p :: [Prop] -> [Fiber] -> Fiber
 p = mkElement "p"
 
-section :: [Prop] -> [VNode] -> VNode
+section :: [Prop] -> [Fiber] -> Fiber
 section = mkElement "section"
 
-article :: [Prop] -> [VNode] -> VNode
+article :: [Prop] -> [Fiber] -> Fiber
 article = mkElement "article"
 
-aside :: [Prop] -> [VNode] -> VNode
+aside :: [Prop] -> [Fiber] -> Fiber
 aside = mkElement "aside"
 
-header :: [Prop] -> [VNode] -> VNode
+header :: [Prop] -> [Fiber] -> Fiber
 header = mkElement "header"
 
-footer :: [Prop] -> [VNode] -> VNode
+footer :: [Prop] -> [Fiber] -> Fiber
 footer = mkElement "footer"
 
-main :: [Prop] -> [VNode] -> VNode
+main :: [Prop] -> [Fiber] -> Fiber
 main = mkElement "main"
 
-nav :: [Prop] -> [VNode] -> VNode
+nav :: [Prop] -> [Fiber] -> Fiber
 nav = mkElement "nav"
 
 -- Headings
-h1 :: [Prop] -> [VNode] -> VNode
+h1 :: [Prop] -> [Fiber] -> Fiber
 h1 = mkElement "h1"
 
-h2 :: [Prop] -> [VNode] -> VNode
+h2 :: [Prop] -> [Fiber] -> Fiber
 h2 = mkElement "h2"
 
-h3 :: [Prop] -> [VNode] -> VNode
+h3 :: [Prop] -> [Fiber] -> Fiber
 h3 = mkElement "h3"
 
-h4 :: [Prop] -> [VNode] -> VNode
+h4 :: [Prop] -> [Fiber] -> Fiber
 h4 = mkElement "h4"
 
-h5 :: [Prop] -> [VNode] -> VNode
+h5 :: [Prop] -> [Fiber] -> Fiber
 h5 = mkElement "h5"
 
-h6 :: [Prop] -> [VNode] -> VNode
+h6 :: [Prop] -> [Fiber] -> Fiber
 h6 = mkElement "h6"
 
 -- Text
-em :: [Prop] -> [VNode] -> VNode
+em :: [Prop] -> [Fiber] -> Fiber
 em = mkElement "em"
 
-strong :: [Prop] -> [VNode] -> VNode
+strong :: [Prop] -> [Fiber] -> Fiber
 strong = mkElement "strong"
 
-code :: [Prop] -> [VNode] -> VNode
+code :: [Prop] -> [Fiber] -> Fiber
 code = mkElement "code"
 
-pre :: [Prop] -> [VNode] -> VNode
+pre :: [Prop] -> [Fiber] -> Fiber
 pre = mkElement "pre"
 
-blockquote :: [Prop] -> [VNode] -> VNode
+blockquote :: [Prop] -> [Fiber] -> Fiber
 blockquote = mkElement "blockquote"
 
 -- Lists
-ul :: [Prop] -> [VNode] -> VNode
+ul :: [Prop] -> [Fiber] -> Fiber
 ul = mkElement "ul"
 
-ol :: [Prop] -> [VNode] -> VNode
+ol :: [Prop] -> [Fiber] -> Fiber
 ol = mkElement "ol"
 
-li :: [Prop] -> [VNode] -> VNode
+li :: [Prop] -> [Fiber] -> Fiber
 li = mkElement "li"
 
 -- Tables
-table :: [Prop] -> [VNode] -> VNode
+table :: [Prop] -> [Fiber] -> Fiber
 table = mkElement "table"
 
-thead :: [Prop] -> [VNode] -> VNode
+thead :: [Prop] -> [Fiber] -> Fiber
 thead = mkElement "thead"
 
-tbody :: [Prop] -> [VNode] -> VNode
+tbody :: [Prop] -> [Fiber] -> Fiber
 tbody = mkElement "tbody"
 
-tr :: [Prop] -> [VNode] -> VNode
+tr :: [Prop] -> [Fiber] -> Fiber
 tr = mkElement "tr"
 
-th :: [Prop] -> [VNode] -> VNode
+th :: [Prop] -> [Fiber] -> Fiber
 th = mkElement "th"
 
-td :: [Prop] -> [VNode] -> VNode
+td :: [Prop] -> [Fiber] -> Fiber
 td = mkElement "td"
 
 -- Forms
-form :: [Prop] -> [VNode] -> VNode
+form :: [Prop] -> [Fiber] -> Fiber
 form = mkElement "form"
 
-label :: [Prop] -> [VNode] -> VNode
+label :: [Prop] -> [Fiber] -> Fiber
 label = mkElement "label"
 
-input :: [Prop] -> VNode
+input :: [Prop] -> Fiber
 input = mkVoid "input"
 
-textarea :: [Prop] -> [VNode] -> VNode
+textarea :: [Prop] -> [Fiber] -> Fiber
 textarea = mkElement "textarea"
 
-select :: [Prop] -> [VNode] -> VNode
+select :: [Prop] -> [Fiber] -> Fiber
 select = mkElement "select"
 
-option :: [Prop] -> [VNode] -> VNode
+option :: [Prop] -> [Fiber] -> Fiber
 option = mkElement "option"
 
-button :: [Prop] -> [VNode] -> VNode
+button :: [Prop] -> [Fiber] -> Fiber
 button = mkElement "button"
 
 -- Media / links
-img :: [Prop] -> VNode
+img :: [Prop] -> Fiber
 img = mkVoid "img"
 
-a :: [Prop] -> [VNode] -> VNode
+a :: [Prop] -> [Fiber] -> Fiber
 a = mkElement "a"
 
 -- Fragment & null
-fragment :: [VNode] -> VNode
-fragment = VFragment
+fragment :: [Fiber] -> Fiber
+fragment = FFragment
 
-nullElem :: VNode
-nullElem = VNull
+nullElem :: Fiber
+nullElem = FNull
 
 -- | Helper for rendering keyed lists (like mapping over arrays in JSX).
 --
 -- @
 -- keyedList "ul" [] (map (\\item -> (itemId item, li [] [text (itemName item)])) items)
 -- @
-keyedList :: String -> [Prop] -> [(Key, VNode)] -> VNode
+keyedList :: String -> [Prop] -> [(Key, Fiber)] -> Fiber
 keyedList tag props items =
   let (attrs, events, _) = toAttrsAndEvents props
-  in VKeyed tag attrs events items
+  in FKeyed tag attrs events items

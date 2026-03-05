@@ -1,9 +1,11 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures -Wno-type-defaults #-}
 
 -- | Todo application — demonstrates useState, useReducer, useRef, useMemo, use.
-module Examples.TodoApp
+module TodoApp
   ( todoApp
   , todoAppWithAsync
   , Todo(..)
@@ -11,6 +13,8 @@ module Examples.TodoApp
 
 import MReact.Prelude
 import qualified Prelude
+
+default (Int, String)
 
 --------------------------------------------------------------------------------
 -- Types
@@ -46,16 +50,12 @@ todoReducer todos (RemoveTodo tid) =
 
 -- | A todo app using useReducer for state management.
 --
--- The type signature is:
--- @
--- FC '[] '[ SMemo Int, SRef String, SReducer [Todo]] ()
--- @
---
+-- The hook list @'[ SMemo Int, SRef String, SReducer [Todo]]@ is inferred.
 -- Read right-to-left:
 --   1. @SReducer [Todo]@ — useReducer for the todo list
 --   2. @SRef String@ — useRef for the input value
 --   3. @SMemo Int@ — useMemo for the completed count
-todoApp :: FC '[] '[ SMemo Int, SRef String, SReducer [Todo]] ()
+todoApp :: FC _ ()
 todoApp () = do
   (todos, dispatch) <- useReducer todoReducer []
   inputRef <- useRef ""
@@ -82,7 +82,7 @@ todoApp () = do
         ]
     ]
 
-renderTodo :: Dispatch TodoAction -> Todo -> VNode
+renderTodo :: Dispatch TodoAction -> Todo -> Fiber
 renderTodo dispatch todo =
   li [ class_ (if todoDone todo then "done" else "")
      , onClick (\_ -> dispatch (ToggleTodo (todoId todo)))
@@ -94,56 +94,26 @@ renderTodo dispatch todo =
 
 --------------------------------------------------------------------------------
 -- Async example: use + suspense
---
--- Mirrors the React 19 pattern:
---
--- @
--- function MessageContainer({ messagePromise }) {
---   return (
---     <Suspense fallback={<p>⌛Downloading message...</p>}>
---       <Message messagePromise={messagePromise} />
---     </Suspense>
---   );
--- }
---
--- function Message({ messagePromise }) {
---   const content = use(messagePromise);
---   return <p>Here is the message: {content}</p>;
--- }
--- @
 --------------------------------------------------------------------------------
 
 -- | Inner component that unwraps an Async with @use@.
---
--- @use@ has identity index (@i -> i@), so @todoList@ is also identity.
--- This means it can appear inside control flow and Suspense boundaries.
-todoList :: Async [Todo] -> Hooks i i VNode
+todoList :: Async [Todo] -> Hooks i i Fiber
 todoList todosPromise = do
   todos <- use todosPromise
   return $ ul []
     (Prelude.map (\t -> li [] [text (todoText t)]) todos)
 
 -- | Container component that wraps the inner component in a Suspense boundary.
---
--- Mirrors React's @\<Suspense fallback={...}\>@ pattern.
--- When @todosPromise@ is 'Pending', the fallback is shown.
--- When resolved, @todoList@ renders normally.
-todoContainer :: Async [Todo] -> Hooks i i VNode
+todoContainer :: Async [Todo] -> Hooks i i Fiber
 todoContainer todosPromise =
   suspense (p [] [text "\x231B Downloading todos..."]) $
     todoList todosPromise
 
 -- | Full app with a toggle button and Suspense boundary.
---
--- The type is @FC '[] '[ SState Bool] ()@ — @use@ does NOT appear
--- in the index because it is identity. This is what allows it inside
--- the @if@ branch.
-todoAppWithAsync :: Async [Todo] -> FC '[] '[ SState Bool] ()
+todoAppWithAsync :: Async [Todo] -> FC _ ()
 todoAppWithAsync todosPromise () = do
   (showTodos, setShowTodos) <- useState True
 
-  -- `use` inside control flow: VALID because index is identity
-  -- `suspense` catches suspension and shows fallback
   let content = if showTodos
         then todoContainer todosPromise
         else return $ div [] ["Todos hidden"]

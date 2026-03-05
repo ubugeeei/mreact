@@ -1,26 +1,28 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures -Wno-type-defaults #-}
 
 -- | Counter example — demonstrates useState and useEffect.
-module Examples.Counter
+module Counter
   ( counterApp
   ) where
 
 import MReact.Prelude
 
+default (Int, String)
+
 -- | A simple counter component.
 --
--- Type signature reveals exactly which hooks are used:
+-- The hook list is inferred via @PartialTypeSignatures@:
 --   * @'SEffect@ — one useEffect call
 --   * @'SState Int@ — one useState(Int) call
---
--- (Read right-to-left: hooks are prepended by each call.)
 --
 -- @doubleCount@ and @parity@ are derived state — plain Haskell @let@
 -- bindings that recompute on every render, not memoized via @useMemo@.
 -- This is the idiomatic approach when the derivation is cheap.
-counterApp :: FC '[] '[ SEffect, SState Int] ()
+counterApp :: FC _ ()
 counterApp () = do
   (count, setCount) <- useState 0
 

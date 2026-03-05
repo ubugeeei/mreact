@@ -2,20 +2,20 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 
--- | Fiber data structure — the runtime state for a mounted component.
+-- | FiberInstance data structure — the runtime state for a mounted component.
 --
--- Each fiber holds:
+-- Each fiber instance holds:
 --   * A hook store (the memoized state from each hook call)
 --   * A cursor tracking the current hook position during rendering
---   * The previously rendered VDOM (for diffing)
+--   * The previously rendered fiber tree (for diffing)
 --   * Effect queues (for commit phase)
 --
 -- This corresponds to React Fiber in the algebraic effects model:
--- the fiber IS the effect handler's internal state.
+-- the fiber instance IS the effect handler's internal state.
 module MReact.Runtime.Fiber
-  ( -- * Fiber
-    Fiber(..)
-  , newFiber
+  ( -- * FiberInstance
+    FiberInstance(..)
+  , newFiberInstance
   , resetCursor
     -- * Hook store
   , HookStore
@@ -32,7 +32,7 @@ module MReact.Runtime.Fiber
   ) where
 
 import Data.IORef
-import MReact.VDOM (VNode(..))
+import MReact.Fiber (Fiber(..))
 
 --------------------------------------------------------------------------------
 -- Existential wrapper for hook values
@@ -86,19 +86,19 @@ data EffectEntry = EffectEntry
   }
 
 --------------------------------------------------------------------------------
--- Fiber
+-- FiberInstance
 --------------------------------------------------------------------------------
 
--- | A Fiber represents a mounted component instance.
-data Fiber = Fiber
+-- | A FiberInstance represents a mounted component instance.
+data FiberInstance = FiberInstance
   { fiberHookStore    :: !HookStore
     -- ^ All hook values, indexed by call order
   , fiberCursor       :: !(IORef Int)
     -- ^ Current hook index (reset to 0 before each render)
   , fiberIsFirstRender :: !(IORef Bool)
     -- ^ True during the initial render
-  , fiberPrevVDOM     :: !(IORef VNode)
-    -- ^ VDOM from the previous render (for diffing)
+  , fiberPrevTree     :: !(IORef Fiber)
+    -- ^ Fiber tree from the previous render (for diffing)
   , fiberEffects      :: !(IORef [EffectEntry])
     -- ^ Pending effects (passive and layout)
   , fiberIdCounter    :: !(IORef Int)
@@ -107,27 +107,27 @@ data Fiber = Fiber
     -- ^ Callback to schedule a re-render of this fiber
   }
 
--- | Create a new fiber for a component.
-newFiber :: IO () -> IO Fiber
-newFiber scheduleUpdate = do
+-- | Create a new fiber instance for a component.
+newFiberInstance :: IO () -> IO FiberInstance
+newFiberInstance scheduleUpdate = do
   store   <- newIORef []
   cursor  <- newIORef 0
   first   <- newIORef True
-  prev    <- newIORef VNull
+  prev    <- newIORef FNull
   effects <- newIORef []
   idCtr   <- newIORef 0
-  pure Fiber
+  pure FiberInstance
     { fiberHookStore     = store
     , fiberCursor        = cursor
     , fiberIsFirstRender = first
-    , fiberPrevVDOM      = prev
+    , fiberPrevTree      = prev
     , fiberEffects       = effects
     , fiberIdCounter     = idCtr
     , fiberScheduleUpdate = scheduleUpdate
     }
 
 -- | Reset the hook cursor to 0 (called before each render pass).
-resetCursor :: Fiber -> IO ()
+resetCursor :: FiberInstance -> IO ()
 resetCursor fiber = writeIORef (fiberCursor fiber) 0
 
 --------------------------------------------------------------------------------

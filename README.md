@@ -14,17 +14,21 @@ The sole exception is `use` (React 19's Promise API), whose index is the monoid 
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures -Wno-type-defaults #-}
 
 module MyComponent where
 
 import MReact.Prelude
 
-counter :: FC '[] '[ SEffect, SState Int] ()
+default (Int, String)
+
+counter :: FC _ ()
 counter () = do
-  (count, setCount) <- useState (0 :: Int)
+  (count, setCount) <- useState 0
 
   let doubleCount   =  count * 2
-  let parity        =  if even count then "even" else "odd" :: String
+  let parity        =  if even count then "even" else "odd"
 
   useEffect (deps count) $
     putStrLn $ "Count: " ++ show count
@@ -37,7 +41,7 @@ counter () = do
     ]
 ```
 
-Import `MReact.Prelude` with `RebindableSyntax` and `OverloadedStrings` to get indexed do-notation and string-literal VNodes. The type signature `FC '[] '[ SEffect, SState Int] ()` reads right-to-left: one `useState Int`, then one `useEffect`.
+Import `MReact.Prelude` with `RebindableSyntax` and `OverloadedStrings` to get indexed do-notation and string-literal fibers. The hook list in `FC _ ()` is inferred via `PartialTypeSignatures` — no need to write it out. `default (Int, String)` lets GHC resolve numeric and string literal types automatically.
 
 ## How it works
 
@@ -59,8 +63,8 @@ Each hook prepends a `Slot` to `j`. `RebindableSyntax` rebinds `>>=` to `ibind`,
 -- TYPE ERROR: branches have different indices
 bad () = do
   if condition
-    then do { (n, _) <- useState 0; ... }  -- Hooks i (SState Int ': i) VNode
-    else return nullElem                     -- Hooks i i VNode
+    then do { (n, _) <- useState 0; ... }  -- Hooks i (SState Int ': i) Fiber
+    else return nullElem                     -- Hooks i i Fiber
 ```
 
 Both branches of an `if` must produce the same type. Since `useState` changes the index and `return` doesn't, GHC rejects this at compile time.
@@ -88,12 +92,12 @@ function Message({ messagePromise }) {
 
 ```haskell
 -- MReact
-message :: Async String -> Hooks i i VNode
+message :: Async String -> Hooks i i Fiber
 message messagePromise = do
   content <- use messagePromise
   return $ p [] [text ("Here is the message: " ++ content)]
 
-messageContainer :: Async String -> Hooks i i VNode
+messageContainer :: Async String -> Hooks i i Fiber
 messageContainer messagePromise =
   suspense (p [] [text "⌛Downloading message..."]) $
     message messagePromise
@@ -105,9 +109,9 @@ Both `use` and `suspense` have identity index (`i -> i`), so they may appear ins
 if showDetails
   then do
     details <- use fetchDetails   -- Hooks i i String
-    return (text details)         -- Hooks i i VNode
+    return (text details)         -- Hooks i i Fiber
   else
-    return nullElem               -- Hooks i i VNode
+    return nullElem               -- Hooks i i Fiber
 ```
 
 ### `useDeferredValue` — stale-while-revalidate
@@ -115,7 +119,7 @@ if showDetails
 `useDeferredValue` returns a "deferred" version of a value. On urgent re-renders, it returns the **old** value first, then schedules a background re-render to commit the new value:
 
 ```haskell
-searchApp :: FC '[] '[ SDeferredValue String, SState String] ()
+searchApp :: FC _ ()
 searchApp () = do
   (query, setQuery) <- useState ""
   deferredQuery     <- useDeferredValue query
@@ -161,6 +165,22 @@ expensiveResult <- useMemo (deps items) (\() -> computeExpensive items)
 | `use` | *(none)* | `i -> i` (identity) |
 | `suspense` | *(none)* | `i -> i` (identity) |
 
+## Examples
+
+Examples for each hook are in the `examples/` directory:
+
+| File | Hooks demonstrated |
+|---|---|
+| `Counter.hs` | `useState`, `useEffect` |
+| `TodoApp.hs` | `useReducer`, `useRef`, `useMemo`, `use`, `suspense` |
+| `DeferredValue.hs` | `useDeferredValue`, `useState` |
+| `UseRef.hs` | `useRef`, `useState`, `useEffect` |
+| `UseMemo.hs` | `useMemo`, `useState` |
+| `UseCallback.hs` | `useCallback`, `useState` |
+| `UseContext.hs` | `useContext` |
+| `UseId.hs` | `useId` |
+| `UseTransition.hs` | `useTransition`, `useState` |
+
 ## Architecture
 
 ```
@@ -168,10 +188,10 @@ MReact.Indexed          -- IxFunctor, IxApplicative, IxMonad
 MReact.Types            -- Slot, Deps, Ref, Async, Context, SuspendException
 MReact.Hooks            -- Hooks GADT (free indexed monad)
 MReact.Component        -- FC, StatelessFC, Provider, suspense
-MReact.VDOM             -- Virtual DOM types
-MReact.VDOM.Diff        -- Diffing algorithm (reconciliation)
+MReact.Fiber            -- Fiber node types
+MReact.Fiber.Diff       -- Diffing algorithm (reconciliation)
 MReact.DOM              -- HTML element DSL (JSX equivalent)
-MReact.Runtime.Fiber    -- Fiber data structure (hook store)
+MReact.Runtime.Fiber    -- FiberInstance data structure (hook store)
 MReact.Runtime.Scheduler -- Interpreter (algebraic effect handler)
 MReact.Browser          -- GHCJS backend & SSR (renderToString)
 MReact.Prelude          -- User-facing prelude (RebindableSyntax)

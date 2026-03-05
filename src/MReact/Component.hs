@@ -7,7 +7,7 @@
 -- A React Component is a Kleisli arrow in the indexed monad:
 --
 -- @
--- Component : Props -> Hooks i j VDOM
+-- Component : Props -> Hooks i j Fiber
 -- @
 --
 -- The indices @i@ and @j@ make the hook usage visible in the type signature,
@@ -29,7 +29,7 @@ module MReact.Component
 
 import MReact.Types
 import MReact.Hooks (Hooks(..))
-import MReact.VDOM
+import MReact.Fiber
 
 --------------------------------------------------------------------------------
 -- Component type aliases
@@ -44,24 +44,32 @@ import MReact.VDOM
 -- Example:
 --
 -- @
--- counter :: Component '[] '[ 'SState Int] () VDOM
+-- counter :: Component '[] '[ 'SState Int] () Fiber
 -- counter () = do
 --   (count, setCount) <- useState 0
 --   return $ text_ (show count)
 -- @
 type Component (i :: [Slot]) (j :: [Slot]) props result = props -> Hooks i j result
 
--- | Function Component — a Component that returns VDOM.
+-- | Function Component — a Component that returns a Fiber.
 -- This is the most common component type.
 --
+-- The input index is fixed to @'[]@ (fresh component root).
+-- The output index @j@ tracks which hooks were used; with
+-- @PartialTypeSignatures@ you can simply write @FC _ Props@
+-- and let GHC infer the hook list.
+--
 -- @
--- greeting :: FC '[] '[ 'SContext Theme, 'SState Int] GreetingProps
+-- {-\# LANGUAGE PartialTypeSignatures \#-}
+-- {-\# OPTIONS_GHC -Wno-partial-type-signatures \#-}
+--
+-- greeting :: FC _ GreetingProps
 -- greeting props = do
 --   (count, setCount) <- useState 0
 --   theme <- useContext themeCtx
 --   return $ div_ [] [text_ (name props ++ ": " ++ show count)]
 -- @
-type FC (i :: [Slot]) (j :: [Slot]) props = Component i j props VNode
+type FC (j :: [Slot]) props = Component '[] j props Fiber
 
 -- | A stateless function component uses no hooks at all.
 -- Both indices are @'[]@, meaning only @use@ (identity-index)
@@ -71,14 +79,14 @@ type FC (i :: [Slot]) (j :: [Slot]) props = Component i j props VNode
 -- greeting :: StatelessFC GreetingProps
 -- greeting props = return $ h1_ [] [text_ ("Hello, " ++ name props)]
 -- @
-type StatelessFC props = FC '[] '[] props
+type StatelessFC props = FC '[] props
 
 --------------------------------------------------------------------------------
 -- Context Provider
 --------------------------------------------------------------------------------
 
 -- | A context provider wraps children with a context value.
-type Provider a = a -> [VNode] -> VNode
+type Provider a = a -> [Fiber] -> Fiber
 
 -- | Create a context provider for a given 'Context'.
 --
@@ -97,7 +105,7 @@ provider _ctx value children =
   -- In a full implementation, this would push the context value
   -- onto the context stack for child resolution.
   -- For now, we represent it as a fragment with metadata.
-  VFragment children
+  FFragment children
   where
     _unused = value  -- used by the runtime for context resolution
 
@@ -109,7 +117,7 @@ provider _ctx value children =
 --
 -- When a child computation calls @use@ on a 'Pending' 'Async', the
 -- interpreter throws a 'SuspendException'. The Suspense boundary
--- catches this and returns the fallback 'VNode' instead.
+-- catches this and returns the fallback 'Fiber' instead.
 --
 -- __Index is identity__ (@i -> i@), so Suspense can appear anywhere,
 -- including inside control flow.
@@ -121,7 +129,7 @@ provider _ctx value children =
 --     userData <- use fetchUser
 --     return $ div [] [text (userName userData)]
 -- @
-suspense :: VNode -> Hooks i i VNode -> Hooks i i VNode
+suspense :: Fiber -> Hooks i i Fiber -> Hooks i i Fiber
 suspense = HSuspense
 
 --------------------------------------------------------------------------------

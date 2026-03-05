@@ -1,6 +1,6 @@
--- | VDOM diff algorithm.
+-- | Fiber diff algorithm.
 --
--- Computes a minimal set of 'Patch'es to transform one VDOM tree into another.
+-- Computes a minimal set of 'Patch'es to transform one fiber tree into another.
 -- This is the "reconcile" step in the pipeline:
 --
 -- @
@@ -8,13 +8,13 @@
 -- @
 --
 -- The key property is that when @render(s)@ produces structurally equal
--- VDOM trees (which it does for the same state), @reconcile@ produces
+-- fiber trees (which it does for the same state), @reconcile@ produces
 -- an empty patch list, making the overall operation idempotent:
 --
 -- @
 -- u_s . u_s = u_s
 -- @
-module MReact.VDOM.Diff
+module MReact.Fiber.Diff
   ( -- * Patch types
     Patch(..)
   , AttrPatch(..)
@@ -25,7 +25,7 @@ module MReact.VDOM.Diff
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import MReact.VDOM
+import MReact.Fiber
 
 --------------------------------------------------------------------------------
 -- Types
@@ -42,11 +42,11 @@ data AttrPatch
 
 -- | A patch operation to apply to the real DOM.
 data Patch
-  = PReplace    !Path !VNode
+  = PReplace    !Path !Fiber
     -- ^ Replace the entire node at this path
   | PRemove     !Path
     -- ^ Remove the node at this path
-  | PInsert     !Path !Int !VNode
+  | PInsert     !Path !Int !Fiber
     -- ^ Insert a new child at the given index
   | PText       !Path !String
     -- ^ Update text content
@@ -60,32 +60,32 @@ data Patch
 -- Diff algorithm
 --------------------------------------------------------------------------------
 
--- | Compute patches to transform @old@ VDOM into @new@ VDOM.
+-- | Compute patches to transform @old@ fiber tree into @new@ fiber tree.
 -- An empty result means the trees are identical — no DOM mutation needed.
-diff :: VNode -> VNode -> [Patch]
+diff :: Fiber -> Fiber -> [Patch]
 diff old new = diffAt [] old new
 
-diffAt :: Path -> VNode -> VNode -> [Patch]
+diffAt :: Path -> Fiber -> Fiber -> [Patch]
 
 -- Same text
-diffAt _    (VText a)    (VText b)    | a == b = []
-diffAt path (VText _)    (VText b)    = [PText path b]
+diffAt _    (FText a)    (FText b)    | a == b = []
+diffAt path (FText _)    (FText b)    = [PText path b]
 
 -- Same element tag — diff attributes and children
-diffAt path (VElement t1 a1 _ c1) (VElement t2 a2 _ c2)
+diffAt path (FElement t1 a1 _ c1) (FElement t2 a2 _ c2)
   | t1 == t2  = diffAttrs path a1 a2 ++ diffChildren path c1 c2
-  | otherwise = [PReplace path (VElement t2 a2 mempty c2)]
+  | otherwise = [PReplace path (FElement t2 a2 mempty c2)]
 
 -- Keyed elements
-diffAt path (VKeyed t1 a1 _ c1) (VKeyed t2 a2 _ c2)
+diffAt path (FKeyed t1 a1 _ c1) (FKeyed t2 a2 _ c2)
   | t1 == t2  = diffAttrs path a1 a2 ++ diffKeyed path c1 c2
-  | otherwise = [PReplace path (VKeyed t2 a2 mempty c2)]
+  | otherwise = [PReplace path (FKeyed t2 a2 mempty c2)]
 
 -- Fragments
-diffAt path (VFragment c1) (VFragment c2) = diffChildren path c1 c2
+diffAt path (FFragment c1) (FFragment c2) = diffChildren path c1 c2
 
 -- Null
-diffAt _    VNull VNull = []
+diffAt _    FNull FNull = []
 
 -- Type mismatch — full replace
 diffAt path _ new = [PReplace path new]
@@ -110,7 +110,7 @@ diffAttrs path old new
 -- Children diff (positional)
 --------------------------------------------------------------------------------
 
-diffChildren :: Path -> [VNode] -> [VNode] -> [Patch]
+diffChildren :: Path -> [Fiber] -> [Fiber] -> [Patch]
 diffChildren path old new = updates ++ removals ++ insertions
   where
     common = zip3 [0..] old new
@@ -131,7 +131,7 @@ diffChildren path old new = updates ++ removals ++ insertions
 -- Keyed diff (stable identity)
 --------------------------------------------------------------------------------
 
-diffKeyed :: Path -> [(Key, VNode)] -> [(Key, VNode)] -> [Patch]
+diffKeyed :: Path -> [(Key, Fiber)] -> [(Key, Fiber)] -> [Patch]
 diffKeyed path old new
   | map fst old == map fst new =
       -- Same key order: just diff each pair
