@@ -1,4 +1,4 @@
-# MReact
+# mreact
 
 **M**onadic **React** — React Hooks modeled as an indexed (graded) monad in Haskell.
 
@@ -22,10 +22,8 @@ counter :: FC '[] '[ SEffect, SState Int] ()
 counter () = do
   (count, setCount) <- useState (0 :: Int)
 
-  -- Derived state: plain let bindings, recomputed every render.
-  -- No hook slot allocated — this is NOT useMemo.
-  let doubleCount = count * 2
-      parity      = if even count then "even" else "odd" :: String
+  let doubleCount   =  count * 2
+  let parity        =  if even count then "even" else "odd" :: String
 
   useEffect (deps count) $ do
     putStrLn $ "Count: " ++ show count
