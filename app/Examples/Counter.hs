@@ -29,7 +29,7 @@ counterApp () = do
   let parity        =  if even count then "even" else "odd"
 
   useEffect (deps count) $
-    putStrLn ("Count changed to: " ++ show count)
+    putStrLn ("Count changed (from useEffect): " ++ show count)
 
   return $ div [class_ "counter"]
     [ h1 [] ["Counter"]

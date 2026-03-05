@@ -238,7 +238,9 @@ interpret fiber _ctx (HEffect hookDeps action) = do
       let entry = unsafeCoerce stored :: EffectEntry
       shouldRun <- checkDeps hookDeps (effectDeps entry)
       if shouldRun
-        then modifyIORef' (fiberEffects fiber) (++ [entry])
+        then do
+          let updatedEntry = entry { effectAction = action }
+          modifyIORef' (fiberEffects fiber) (++ [updatedEntry])
         else pure ()
       pure ()
 
@@ -260,7 +262,9 @@ interpret fiber _ctx (HLayoutEffect hookDeps action) = do
       let entry = unsafeCoerce stored :: EffectEntry
       shouldRun <- checkDeps hookDeps (effectDeps entry)
       if shouldRun
-        then modifyIORef' (fiberEffects fiber) (++ [entry])
+        then do
+          let updatedEntry = entry { effectAction = action }
+          modifyIORef' (fiberEffects fiber) (++ [updatedEntry])
         else pure ()
       pure ()
 
