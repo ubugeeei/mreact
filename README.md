@@ -65,13 +65,41 @@ bad () = do
 
 Both branches of an `if` must produce the same type. Since `useState` changes the index and `return` doesn't, GHC rejects this at compile time.
 
-### `use` — the identity exception
+### `use` + `Suspense` — React 19's async data pattern
 
-```haskell
-use :: Async a -> Hooks i i a   -- index unchanged!
+`use` unwraps an `Async` (Promise) with identity index, so it's safe inside control flow. When the `Async` is still pending, it throws a `SuspendException`, which the nearest `suspense` boundary catches to display a fallback.
+
+This mirrors React 19's pattern directly:
+
+```jsx
+// React
+function MessageContainer({ messagePromise }) {
+  return (
+    <Suspense fallback={<p>⌛Downloading message...</p>}>
+      <Message messagePromise={messagePromise} />
+    </Suspense>
+  );
+}
+function Message({ messagePromise }) {
+  const content = use(messagePromise);
+  return <p>Here is the message: {content}</p>;
+}
 ```
 
-`use` doesn't allocate a slot, so it's safe inside control flow:
+```haskell
+-- MReact
+message :: Async String -> Hooks i i VNode
+message messagePromise = do
+  content <- use messagePromise
+  return $ p [] [text ("Here is the message: " ++ content)]
+
+messageContainer :: Async String -> Hooks i i VNode
+messageContainer messagePromise =
+  suspense (p [] [text "⌛Downloading message..."]) $
+    message messagePromise
+```
+
+Both `use` and `suspense` have identity index (`i -> i`), so they may appear inside conditionals and loops:
 
 ```haskell
 if showDetails
@@ -80,6 +108,23 @@ if showDetails
     return (text details)         -- Hooks i i VNode
   else
     return nullElem               -- Hooks i i VNode
+```
+
+### `useDeferredValue` — stale-while-revalidate
+
+`useDeferredValue` returns a "deferred" version of a value. On urgent re-renders, it returns the **old** value first, then schedules a background re-render to commit the new value:
+
+```haskell
+searchApp :: FC '[] '[ SDeferredValue String, SState String] ()
+searchApp () = do
+  (query, setQuery) <- useState ""
+  deferredQuery     <- useDeferredValue query
+  -- Urgent render:   query = "abc", deferredQuery = ""  (stale)
+  -- Deferred render: query = "abc", deferredQuery = "abc" (caught up)
+  return $ div []
+    [ input [onInput (\e -> setQuery (eventTarget e))]
+    , p [] [text ("deferred: " ++ deferredQuery)]
+    ]
 ```
 
 ### Derived state vs. `useMemo`
@@ -114,14 +159,15 @@ expensiveResult <- useMemo (deps items) (\() -> computeExpensive items)
 | `useTransition` | `STransition` | `i -> STransition ': i` |
 | `useDeferredValue` | `SDeferredValue a` | `i -> SDeferredValue a ': i` |
 | `use` | *(none)* | `i -> i` (identity) |
+| `suspense` | *(none)* | `i -> i` (identity) |
 
 ## Architecture
 
 ```
 MReact.Indexed          -- IxFunctor, IxApplicative, IxMonad
-MReact.Types            -- Slot, Deps, Ref, Async, Context
+MReact.Types            -- Slot, Deps, Ref, Async, Context, SuspendException
 MReact.Hooks            -- Hooks GADT (free indexed monad)
-MReact.Component        -- FC, StatelessFC, Provider, Suspense
+MReact.Component        -- FC, StatelessFC, Provider, suspense
 MReact.VDOM             -- Virtual DOM types
 MReact.VDOM.Diff        -- Diffing algorithm (reconciliation)
 MReact.DOM              -- HTML element DSL (JSX equivalent)
