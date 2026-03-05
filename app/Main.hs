@@ -15,6 +15,7 @@ import MReact.Runtime.Scheduler (render, reconcile, runEffects)
 
 import Examples.Counter (counterApp)
 import Examples.TodoApp (todoAppWithAsync, Todo(..))
+import Examples.DeferredValue (deferredApp)
 
 --------------------------------------------------------------------------------
 -- ANSI escape codes
@@ -106,7 +107,6 @@ phase icon color msg =
 
 main :: IO ()
 main = do
-  putStrLn "START"
   putStrLn ""
   putStrLn $ bold ++ "  MReact" ++ reset ++ "  " ++ dim ++ "Monadic React Runtime Demo" ++ reset
   putStrLn $ dim ++ "  u_s = commit . reconcile . render(s)" ++ reset
@@ -162,6 +162,20 @@ suspenseDemo = do
   putStrLn $ dim ++ "  ─────────────────────────────────────" ++ reset
   putStrLn ""
 
+  putStrLn $ gray ++ "  -- React equivalent:" ++ reset
+  putStrLn $ gray ++ "  -- function TodoContainer({ todosPromise }) {" ++ reset
+  putStrLn $ gray ++ "  --   return (" ++ reset
+  putStrLn $ gray ++ "  --     <Suspense fallback={<p>⌛ Downloading todos...</p>}>" ++ reset
+  putStrLn $ gray ++ "  --       <TodoList todosPromise={todosPromise} />" ++ reset
+  putStrLn $ gray ++ "  --     </Suspense>" ++ reset
+  putStrLn $ gray ++ "  --   );" ++ reset
+  putStrLn $ gray ++ "  -- }" ++ reset
+  putStrLn $ gray ++ "  -- function TodoList({ todosPromise }) {" ++ reset
+  putStrLn $ gray ++ "  --   const todos = use(todosPromise);" ++ reset
+  putStrLn $ gray ++ "  --   return <ul>{todos.map(t => <li>{t.text}</li>)}</ul>;" ++ reset
+  putStrLn $ gray ++ "  -- }" ++ reset
+  putStrLn ""
+
   -- Already-resolved Async
   stepHeader 6 "Suspense with resolved Async"
   resolvedAsync <- resolve [Todo 0 "Buy milk" False, Todo 1 "Write code" True]
@@ -188,6 +202,55 @@ suspenseDemo = do
   phase ">" cyan "render (resolved → shows content)"
   putStrLn $ "    " ++ showVDOM vdom8
   putStrLn ""
+
+  -- useDeferredValue demo
+  deferredValueDemo
+
+deferredValueDemo :: IO ()
+deferredValueDemo = do
+  putStrLn $ dim ++ "  ─────────────────────────────────────" ++ reset
+  putStrLn $ bold ++ "  useDeferredValue Demo" ++ reset
+  putStrLn $ dim ++ "  ─────────────────────────────────────" ++ reset
+  putStrLn ""
+
+  -- Initial render
+  stepHeader 9 "Initial render (query = \"\")"
+  fiber <- newFiber (pure ())
+  vdom9 <- render fiber newRenderCtx (deferredApp ())
+  writeIORef (fiberPrevVDOM fiber) vdom9
+  writeIORef (fiberIsFirstRender fiber) False
+  phase ">" cyan "render"
+  putStrLn $ "    " ++ showVDOM vdom9
+  putStrLn ""
+
+  -- Simulate typing "abc" — setState triggers re-render
+  stepHeader 10 "Type \"abc\" → urgent render returns stale deferred"
+  -- Find the input handler and simulate
+  let setQuery = findClickHandler "search" vdom9
+  case setQuery of
+    Just handler -> do
+      handler (DOMEvent "click" "abc")
+      -- Urgent re-render: useDeferredValue returns OLD value
+      vdom10 <- render fiber newRenderCtx (deferredApp ())
+      patches10 <- reconcile fiber vdom10
+      phase ">" cyan "render (urgent: deferred still stale)"
+      putStrLn $ "    " ++ showVDOM vdom10
+      phase ">" yellow "reconcile"
+      showPatches patches10
+      putStrLn ""
+
+      -- Deferred re-render: useDeferredValue now returns NEW value
+      stepHeader 11 "Deferred re-render → deferred catches up"
+      vdom11 <- render fiber newRenderCtx (deferredApp ())
+      patches11 <- reconcile fiber vdom11
+      phase ">" cyan "render (deferred: value updated)"
+      putStrLn $ "    " ++ showVDOM vdom11
+      phase ">" yellow "reconcile"
+      showPatches patches11
+      putStrLn ""
+    Nothing -> do
+      phase "!" red "no search handler found"
+      putStrLn ""
 
 stepHeader :: Int -> String -> IO ()
 stepHeader n title = do

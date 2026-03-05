@@ -71,3 +71,4 @@ executable mreact-demo
   other-modules:
     Examples.Counter
     Examples.TodoApp
+    Examples.DeferredValue

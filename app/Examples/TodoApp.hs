@@ -95,34 +95,58 @@ renderTodo dispatch todo =
 --------------------------------------------------------------------------------
 -- Async example: use + suspense
 --
--- This demonstrates two key insights:
---   1. `use` has identity index, so it can appear inside if/else
---   2. `suspense` catches SuspendException and shows a fallback
+-- Mirrors the React 19 pattern:
+--
+-- @
+-- function MessageContainer({ messagePromise }) {
+--   return (
+--     <Suspense fallback={<p>⌛Downloading message...</p>}>
+--       <Message messagePromise={messagePromise} />
+--     </Suspense>
+--   );
+-- }
+--
+-- function Message({ messagePromise }) {
+--   const content = use(messagePromise);
+--   return <p>Here is the message: {content}</p>;
+-- }
+-- @
 --------------------------------------------------------------------------------
 
--- | A component that conditionally fetches data with `use` + `suspense`.
+-- | Inner component that unwraps an Async with @use@.
 --
--- The type is @FC '[] '[ SState Bool] ()@ — note that `use` does NOT
--- appear in the type-level index, because its index is identity @'[]@.
--- This is what allows it inside the @if@ branch.
+-- @use@ has identity index (@i -> i@), so @todoList@ is also identity.
+-- This means it can appear inside control flow and Suspense boundaries.
+todoList :: Async [Todo] -> Hooks i i VNode
+todoList todosPromise = do
+  todos <- use todosPromise
+  return $ ul []
+    (Prelude.map (\t -> li [] [text (todoText t)]) todos)
+
+-- | Container component that wraps the inner component in a Suspense boundary.
 --
--- When @fetchTodos@ is still 'Pending', the @suspense@ boundary
--- catches the 'SuspendException' and renders "Loading..." instead.
--- Once resolved, a re-render is triggered and the todos are displayed.
+-- Mirrors React's @\<Suspense fallback={...}\>@ pattern.
+-- When @todosPromise@ is 'Pending', the fallback is shown.
+-- When resolved, @todoList@ renders normally.
+todoContainer :: Async [Todo] -> Hooks i i VNode
+todoContainer todosPromise =
+  suspense (p [] [text "\x231B Downloading todos..."]) $
+    todoList todosPromise
+
+-- | Full app with a toggle button and Suspense boundary.
+--
+-- The type is @FC '[] '[ SState Bool] ()@ — @use@ does NOT appear
+-- in the index because it is identity. This is what allows it inside
+-- the @if@ branch.
 todoAppWithAsync :: Async [Todo] -> FC '[] '[ SState Bool] ()
-todoAppWithAsync fetchTodos () = do
+todoAppWithAsync todosPromise () = do
   (showTodos, setShowTodos) <- useState True
 
   -- `use` inside control flow: VALID because index is identity
   -- `suspense` catches suspension and shows fallback
   let content = if showTodos
-        then
-          suspense (text "Loading todos...") $ do
-            todos <- use fetchTodos  -- Hooks i i [Todo]  (identity index!)
-            return $ ul []
-              (Prelude.map (\t -> li [] [text (todoText t)]) todos)
-        else
-          return $ div [] ["Todos hidden"]
+        then todoContainer todosPromise
+        else return $ div [] ["Todos hidden"]
 
   rendered <- content
 

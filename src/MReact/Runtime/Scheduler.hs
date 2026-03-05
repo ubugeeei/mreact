@@ -350,19 +350,40 @@ interpret fiber _ctx HTransition = do
       pure (unsafeCoerce stored)
 
 -- useDeferredValue: return (potentially stale) value
+--
+-- React semantics:
+--   - Initial render: return the provided value
+--   - Re-render with new value: return the OLD value first (stale),
+--     then schedule a background re-render where the new value is committed
+--
+-- This uses a (value, IORef Bool) pair in the hook store:
+--   - The Bool flag tracks whether the next render is the "deferred" re-render
+--   - Urgent render: return old, set flag, schedule re-render
+--   - Deferred render: commit new value, clear flag
 interpret fiber _ctx (HDeferred val) = do
-  _cursor <- readIORef (fiberCursor fiber)
+  cursor <- readIORef (fiberCursor fiber)
   modifyIORef' (fiberCursor fiber) (+ 1)
   isFirst <- readIORef (fiberIsFirstRender fiber)
   if isFirst
     then do
-      _ <- appendHook (fiberHookStore fiber) (SomeHookValue val)
+      deferRef <- newIORef False
+      _ <- appendHook (fiberHookStore fiber) (SomeHookValue (val, deferRef))
       pure val
     else do
-      -- In concurrent mode, this might return the previous value
-      -- during urgent renders. Simplified here.
-      SomeHookValue stored <- readHook (fiberHookStore fiber) _cursor
-      pure (unsafeCoerce stored)
+      SomeHookValue stored <- readHook (fiberHookStore fiber) cursor
+      let (oldVal, deferRef) = unsafeCoerce stored
+      isDeferred <- readIORef deferRef
+      if isDeferred
+        then do
+          -- Deferred re-render: commit the new value
+          writeIORef deferRef False
+          writeHook (fiberHookStore fiber) cursor (SomeHookValue (val, deferRef))
+          pure val
+        else do
+          -- Urgent render: return old (stale) value, schedule deferred re-render
+          writeIORef deferRef True
+          fiberScheduleUpdate fiber
+          pure oldVal
 
 -- use: resolve Async — IDENTITY INDEX, no hook slot allocated
 -- When the Async is Pending, throw SuspendException (caught by HSuspense).
