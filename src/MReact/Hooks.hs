@@ -34,6 +34,7 @@ module MReact.Hooks
 
 import MReact.Indexed
 import MReact.Types
+import MReact.VDOM (VNode)
 
 import MReact.Hooks.State
 import MReact.Hooks.Effect
@@ -110,7 +111,22 @@ data Hooks i j a where
   -- @if@\/@case@\/@guard@ without causing a type error.
   -- This is the key insight from the indexed monad discussion:
   -- @use : Async a -> Hooks 1 a@ where @1@ is the monoid unit.
+  --
+  -- When the 'Async' is 'Pending', the interpreter throws a
+  -- 'SuspendException'. The nearest 'HSuspense' boundary catches
+  -- it and renders the fallback instead.
   HUse    :: Async a -> Hooks i i a
+
+  -- | @suspense@: catch suspension from child @use@ calls.
+  --
+  -- __Index is identity__ — Suspense boundaries do not allocate
+  -- hook slots, so they may appear inside control flow.
+  --
+  -- When the child computation throws 'SuspendException' (because
+  -- a @use@ encountered a 'Pending' async), the fallback 'VNode'
+  -- is returned instead. Once the async resolves, a re-render is
+  -- scheduled and the child renders normally.
+  HSuspense :: VNode -> Hooks i i VNode -> Hooks i i VNode
 
 instance IxFunctor Hooks where
   imap = HMap

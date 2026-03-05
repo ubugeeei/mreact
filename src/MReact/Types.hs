@@ -18,9 +18,13 @@ module MReact.Types
   , writeRef
   , modifyRef
     -- * Async (Promise)
+  , AsyncStatus(..)
   , Async(..)
   , async
   , resolve
+  , asyncStatus
+    -- * Suspension
+  , SuspendException(..)
     -- * Context
   , Context(..)
   , createContext
@@ -31,8 +35,11 @@ module MReact.Types
   , TransitionHandle(..)
   ) where
 
+import Control.Concurrent (forkIO)
+import Control.Exception (Exception, SomeException, try)
 import Data.IORef
 import Data.Kind (Type)
+import Data.Typeable (Typeable)
 
 --------------------------------------------------------------------------------
 -- Hook slot kinds — phantom types that annotate the indexed monad
@@ -96,18 +103,67 @@ modifyRef ref = modifyIORef' (unRef ref)
 -- Async (Promise)
 --------------------------------------------------------------------------------
 
+-- | Status of an asynchronous computation.
+data AsyncStatus a
+  = Pending                    -- ^ Not yet resolved
+  | Resolved !a                -- ^ Successfully resolved with a value
+  | Rejected !SomeException    -- ^ Rejected with an error
+
 -- | An asynchronous computation, analogous to JavaScript's @Promise@.
 -- The @use@ API unwraps this with identity index, so it may appear
 -- inside control flow without violating Rules of Hooks.
-newtype Async a = Async { runAsync :: IO a }
+--
+-- Unlike a bare @IO a@, an @Async@ tracks whether the computation
+-- has completed. When @use@ encounters a 'Pending' async, it throws
+-- a 'SuspendException', which the nearest 'Suspense' boundary catches
+-- to display a fallback.
+data Async a = MkAsync
+  { asyncRef    :: !(IORef (AsyncStatus a))
+  , asyncOnResolve :: !(IORef [IO ()])
+  }
+
+-- | Read the current status of an Async.
+asyncStatus :: Async a -> IO (AsyncStatus a)
+asyncStatus = readIORef . asyncRef
 
 -- | Create an Async from an IO action.
-async :: IO a -> Async a
-async = Async
+-- The action is started immediately in a background thread.
+-- When it completes, any registered callbacks (from Suspense boundaries)
+-- are invoked to trigger re-renders.
+async :: IO a -> IO (Async a)
+async action = do
+  ref <- newIORef Pending
+  cbRef <- newIORef []
+  _ <- forkIO $ do
+    result <- try action
+    case result of
+      Right a -> do
+        writeIORef ref (Resolved a)
+        cbs <- readIORef cbRef
+        mapM_ (\cb -> cb) cbs
+      Left e  -> do
+        writeIORef ref (Rejected e)
+        cbs <- readIORef cbRef
+        mapM_ (\cb -> cb) cbs
+  pure (MkAsync ref cbRef)
 
 -- | Create an already-resolved Async (like @Promise.resolve@).
-resolve :: a -> Async a
-resolve = Async . pure
+resolve :: a -> IO (Async a)
+resolve a = do
+  ref <- newIORef (Resolved a)
+  cbRef <- newIORef []
+  pure (MkAsync ref cbRef)
+
+--------------------------------------------------------------------------------
+-- Suspension
+--------------------------------------------------------------------------------
+
+-- | Exception thrown by @use@ when an 'Async' is still 'Pending'.
+-- The nearest 'Suspense' boundary catches this to display its fallback.
+data SuspendException = SuspendException
+  deriving (Show, Typeable)
+
+instance Exception SuspendException
 
 --------------------------------------------------------------------------------
 -- Context

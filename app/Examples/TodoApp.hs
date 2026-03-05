@@ -6,6 +6,7 @@
 module Examples.TodoApp
   ( todoApp
   , todoAppWithAsync
+  , Todo(..)
   ) where
 
 import MReact.Prelude
@@ -92,34 +93,41 @@ renderTodo dispatch todo =
     ]
 
 --------------------------------------------------------------------------------
--- Async example: use inside control flow
+-- Async example: use + suspense
 --
--- This demonstrates the key insight: `use` has identity index,
--- so it can appear inside if/else without violating Rules of Hooks.
+-- This demonstrates two key insights:
+--   1. `use` has identity index, so it can appear inside if/else
+--   2. `suspense` catches SuspendException and shows a fallback
 --------------------------------------------------------------------------------
 
--- | A component that conditionally fetches data with `use`.
+-- | A component that conditionally fetches data with `use` + `suspense`.
 --
 -- The type is @FC '[] '[ SState Bool] ()@ — note that `use` does NOT
 -- appear in the type-level index, because its index is identity @'[]@.
 -- This is what allows it inside the @if@ branch.
+--
+-- When @fetchTodos@ is still 'Pending', the @suspense@ boundary
+-- catches the 'SuspendException' and renders "Loading..." instead.
+-- Once resolved, a re-render is triggered and the todos are displayed.
 todoAppWithAsync :: Async [Todo] -> FC '[] '[ SState Bool] ()
 todoAppWithAsync fetchTodos () = do
   (showTodos, setShowTodos) <- useState True
 
   -- `use` inside control flow: VALID because index is identity
+  -- `suspense` catches suspension and shows fallback
   let content = if showTodos
         then
-          -- use fetchTodos :: Hooks i i [Todo]  (identity index!)
-          let todosAsync = use fetchTodos
-          -- In a real component, we'd bind this in do-notation.
-          -- Showing the structure here:
-          in div [] ["Todos loaded"]
+          suspense (text "Loading todos...") $ do
+            todos <- use fetchTodos  -- Hooks i i [Todo]  (identity index!)
+            return $ ul []
+              (Prelude.map (\t -> li [] [text (todoText t)]) todos)
         else
-          div [] ["Todos hidden"]
+          return $ div [] ["Todos hidden"]
+
+  rendered <- content
 
   return $ div []
     [ button [onClick (\_ -> setShowTodos (not showTodos))]
         [text (if showTodos then "Hide" else "Show")]
-    , content
+    , rendered
     ]

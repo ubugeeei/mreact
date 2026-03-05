@@ -39,6 +39,7 @@ module MReact.Runtime.Scheduler
   , EffectPhase(..)
   ) where
 
+import Control.Exception (catch, throwIO)
 import Data.IORef
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -364,7 +365,26 @@ interpret fiber _ctx (HDeferred val) = do
       pure (unsafeCoerce stored)
 
 -- use: resolve Async — IDENTITY INDEX, no hook slot allocated
-interpret _fiber _ctx (HUse (Async action)) = action
+-- When the Async is Pending, throw SuspendException (caught by HSuspense).
+-- When Resolved, return the value. When Rejected, rethrow the exception.
+interpret fiber _ctx (HUse async') = do
+  status <- readIORef (asyncRef async')
+  case status of
+    Resolved a -> pure a
+    Rejected e -> throwIO e
+    Pending    -> do
+      -- Register re-render callback so the component re-renders when resolved
+      modifyIORef' (asyncOnResolve async') (fiberScheduleUpdate fiber :)
+      throwIO SuspendException
+
+-- suspense: catch SuspendException from child use calls
+-- When the child suspends, return the fallback VNode.
+-- When the child completes normally, return the child's VNode.
+interpret fiber ctx (HSuspense fallbackNode child) =
+  catch (interpret fiber ctx child) handler
+  where
+    handler :: SuspendException -> IO VNode
+    handler SuspendException = pure fallbackNode
 
 --------------------------------------------------------------------------------
 -- Deps checking

@@ -2,16 +2,19 @@
 
 module Main where
 
+import Control.Concurrent (threadDelay)
 import Data.IORef
 import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 
+import MReact.Types (async, resolve)
 import MReact.VDOM
 import MReact.VDOM.Diff
 import MReact.Runtime.Fiber
 import MReact.Runtime.Scheduler (render, reconcile, runEffects)
 
 import Examples.Counter (counterApp)
+import Examples.TodoApp (todoAppWithAsync, Todo(..))
 
 --------------------------------------------------------------------------------
 -- ANSI escape codes
@@ -103,6 +106,7 @@ phase icon color msg =
 
 main :: IO ()
 main = do
+  putStrLn "START"
   putStrLn ""
   putStrLn $ bold ++ "  MReact" ++ reset ++ "  " ++ dim ++ "Monadic React Runtime Demo" ++ reset
   putStrLn $ dim ++ "  u_s = commit . reconcile . render(s)" ++ reset
@@ -143,6 +147,46 @@ main = do
   showPatches patches5
   putStrLn ""
   putStrLn $ "  " ++ green ++ bold ++ "  u_s . u_s = u_s  QED" ++ reset
+  putStrLn ""
+
+  -- Suspense demo
+  putStrLn ""
+  putStrLn $ dim ++ "  (Suspense demo follows)" ++ reset
+  suspenseDemo
+
+suspenseDemo :: IO ()
+suspenseDemo = do
+  putStrLn ""
+  putStrLn $ dim ++ "  ─────────────────────────────────────" ++ reset
+  putStrLn $ bold ++ "  Suspense Demo" ++ reset ++ "  " ++ dim ++ "use + suspense" ++ reset
+  putStrLn $ dim ++ "  ─────────────────────────────────────" ++ reset
+  putStrLn ""
+
+  -- Already-resolved Async
+  stepHeader 6 "Suspense with resolved Async"
+  resolvedAsync <- resolve [Todo 0 "Buy milk" False, Todo 1 "Write code" True]
+  fiber6 <- newFiber (pure ())
+  vdom6 <- render fiber6 newRenderCtx (todoAppWithAsync resolvedAsync ())
+  phase ">" cyan "render (resolved → no suspension)"
+  putStrLn $ "    " ++ showVDOM vdom6
+  putStrLn ""
+
+  -- Pending Async (demonstrates fallback)
+  stepHeader 7 "Suspense with pending Async"
+  pendingAsync <- async (threadDelay 1000000 >> pure [Todo 0 "Fetched item" False])
+  fiber7 <- newFiber (pure ())
+  vdom7 <- render fiber7 newRenderCtx (todoAppWithAsync pendingAsync ())
+  phase ">" cyan "render (pending → shows fallback)"
+  putStrLn $ "    " ++ showVDOM vdom7
+  putStrLn ""
+
+  -- Wait for resolution and re-render
+  stepHeader 8 "After Async resolves → re-render"
+  threadDelay 1200000  -- wait for async to resolve
+  fiber8 <- newFiber (pure ())
+  vdom8 <- render fiber8 newRenderCtx (todoAppWithAsync pendingAsync ())
+  phase ">" cyan "render (resolved → shows content)"
+  putStrLn $ "    " ++ showVDOM vdom8
   putStrLn ""
 
 stepHeader :: Int -> String -> IO ()

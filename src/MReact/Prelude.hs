@@ -62,7 +62,7 @@ module MReact.Prelude
   , useDeferredValue
   , use
 
-    -- * Re-exports: Component types
+    -- * Re-exports: Component types (includes suspense)
   , module MReact.Component
 
     -- * Re-exports: VDOM
@@ -191,5 +191,11 @@ useDeferredValue = HDeferred
 -- This is the only hook-like API that may appear inside @if@, @case@,
 -- and loops. Both branches of a conditional have matching indices
 -- because @use@ does not allocate a hook slot.
+--
+-- When the 'Async' is 'Pending', the interpreter throws a
+-- 'SuspendException'. Wrap the call site in 'suspense' to catch
+-- suspensions and display a fallback.
 use :: Async a -> Hooks i i a
 use = HUse
+
+-- suspense is re-exported from MReact.Component

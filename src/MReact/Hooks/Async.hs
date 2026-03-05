@@ -20,8 +20,24 @@
 --     return nullElem               -- Hooks i i VDOM
 -- @
 --
--- Contrast with @useState@, which adds @'SState s@ to the index
--- and therefore __cannot__ appear conditionally:
+-- == Suspension
+--
+-- When @use@ encounters a 'Pending' 'Async', the interpreter throws
+-- a 'SuspendException'. This is caught by the nearest 'Suspense'
+-- boundary (created via @suspense@), which renders the fallback
+-- VDOM until the async resolves.
+--
+-- @
+-- myComponent () = do
+--   suspense (text "Loading...") $ do
+--     userData <- use fetchUser      -- suspends if pending
+--     return $ div [] [text (userName userData)]
+-- @
+--
+-- == Contrast with useState
+--
+-- @useState@ adds @'SState s@ to the index and therefore __cannot__
+-- appear conditionally:
 --
 -- @
 -- -- Type error: 'SState Int ': i /= i

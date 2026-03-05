@@ -22,7 +22,6 @@ module MReact.Component
   , Provider
   , provider
     -- * Suspense boundary
-  , SuspenseBoundary
   , suspense
     -- * Component composition
   , composeComponents
@@ -106,26 +105,24 @@ provider _ctx value children =
 -- Suspense Boundary
 --------------------------------------------------------------------------------
 
--- | Suspense boundary configuration.
-data SuspenseBoundary = SuspenseBoundary
-  { fallback :: VNode
-  }
-
 -- | Create a Suspense boundary.
 --
--- When a child calls @use@ on an unresolved 'Async', the boundary
--- displays the fallback. This is the effect handler for the @Suspend@
--- algebraic effect.
+-- When a child computation calls @use@ on a 'Pending' 'Async', the
+-- interpreter throws a 'SuspendException'. The Suspense boundary
+-- catches this and returns the fallback 'VNode' instead.
+--
+-- __Index is identity__ (@i -> i@), so Suspense can appear anywhere,
+-- including inside control flow.
 --
 -- @
--- suspense (text_ "Loading...")
---   [ userProfile userId
---   ]
+-- myComponent () = do
+--   (showDetails, _) <- useState True
+--   suspense (text "Loading...") $ do
+--     userData <- use fetchUser
+--     return $ div [] [text (userName userData)]
 -- @
-suspense :: VNode -> [VNode] -> VNode
-suspense _fallbackNode children = VFragment children
-  -- In the runtime, this node is recognized as a Suspense boundary.
-  -- The fallback is displayed when a child's `use` throws (Promise pending).
+suspense :: VNode -> Hooks i i VNode -> Hooks i i VNode
+suspense = HSuspense
 
 --------------------------------------------------------------------------------
 -- Component composition (Kleisli composition)
