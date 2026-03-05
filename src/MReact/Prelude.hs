@@ -16,9 +16,9 @@
 -- counter :: FC '[] '[ 'SState Int] ()
 -- counter () = do
 --   (count, setCount) <- useState 0
---   return $ div_ []
---     [ text_ ("Count: " ++ show count)
---     , button_ [onClick (\\_ -> setCount (+ 1))] [text_ "+"]
+--   return $ div []
+--     [ text ("Count: " ++ show count)
+--     , button [onClick (\\_ -> setCount (+ 1))] ["+"]
 --     ]
 -- @
 --
@@ -51,7 +51,9 @@ module MReact.Prelude
   , useReducer
   , useRef
   , useEffect
+  , useEffectWithCleanup
   , useLayoutEffect
+  , useLayoutEffectWithCleanup
   , useMemo
   , useCallback
   , useContext
@@ -67,6 +69,9 @@ module MReact.Prelude
   , VNode(..)
   , vdomEq
 
+    -- * Re-exports: OverloadedStrings support
+  , IsString(..)
+
     -- * Re-exports: DOM DSL (JSX equivalent)
   , module MReact.DOM
 
@@ -75,13 +80,14 @@ module MReact.Prelude
   ) where
 
 -- We hide Prelude's monad operations so RebindableSyntax picks up ours
-import Prelude hiding (return, (>>=), (>>), fail)
+import Prelude hiding (return, (>>=), (>>), fail, div, span, id, head, map, pred)
 import qualified Prelude
 
 import MReact.Types
 import MReact.Hooks (Hooks(..))
 import MReact.Component
 import MReact.VDOM (VNode(..), vdomEq)
+import Data.String (IsString(..))
 import MReact.DOM
 
 -- $rebindable
@@ -139,14 +145,22 @@ useRef :: a -> Hooks i (SRef a ': i) (Ref a)
 useRef = HRef
 
 -- | Schedule a side effect (runs after commit). Index: @i -> 'SEffect ': i@.
+useEffect :: Deps -> IO () -> Hooks i (SEffect ': i) ()
+useEffect d eff = HEffect d (eff Prelude.>> Prelude.pure (Prelude.pure ()))
+
+-- | Like 'useEffect' but with a cleanup function.
 --
--- The @IO (IO ())@ is: effect body returns cleanup function.
-useEffect :: Deps -> IO (IO ()) -> Hooks i (SEffect ': i) ()
-useEffect = HEffect
+-- The @IO (IO ())@ is: effect body returns cleanup action.
+useEffectWithCleanup :: Deps -> IO (IO ()) -> Hooks i (SEffect ': i) ()
+useEffectWithCleanup = HEffect
 
 -- | Schedule a synchronous effect (runs before paint). Index: @i -> 'SLayoutEffect ': i@.
-useLayoutEffect :: Deps -> IO (IO ()) -> Hooks i (SLayoutEffect ': i) ()
-useLayoutEffect = HLayoutEffect
+useLayoutEffect :: Deps -> IO () -> Hooks i (SLayoutEffect ': i) ()
+useLayoutEffect d eff = HLayoutEffect d (eff Prelude.>> Prelude.pure (Prelude.pure ()))
+
+-- | Like 'useLayoutEffect' but with a cleanup function.
+useLayoutEffectWithCleanup :: Deps -> IO (IO ()) -> Hooks i (SLayoutEffect ': i) ()
+useLayoutEffectWithCleanup = HLayoutEffect
 
 -- | Cache a computed value. Index: @i -> 'SMemo a ': i@.
 useMemo :: Deps -> (() -> a) -> Hooks i (SMemo a ': i) a

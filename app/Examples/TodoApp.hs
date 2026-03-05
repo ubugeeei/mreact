@@ -1,4 +1,5 @@
 {-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 
 -- | Todo application — demonstrates useState, useReducer, useRef, useMemo, use.
@@ -61,33 +62,33 @@ todoApp () = do
   completedCount <- useMemo (deps todos) (\() ->
     Prelude.length (Prelude.filter todoDone todos))
 
-  return $ div_ [class_ "todo-app"]
-    [ h1_ [] [text_ "Todo App"]
-    , div_ [class_ "todo-input"]
-        [ input_ [ placeholder_ "What needs to be done?"
-                  , onInput (\_ -> Prelude.pure ())  -- would update ref
-                  ]
-        , button_ [onClick (\_ ->
+  return $ div [class_ "todo-app"]
+    [ h1 [] ["Todo App"]
+    , div [class_ "todo-input"]
+        [ input [ placeholder "What needs to be done?"
+                , onInput (\_ -> Prelude.pure ())
+                ]
+        , button [onClick (\_ ->
             readRef inputRef Prelude.>>= \val ->
             dispatch (AddTodo val) Prelude.>>
             writeRef inputRef ""
-          )] [text_ "Add"]
+          )] ["Add"]
         ]
-    , ul_ [class_ "todo-list"]
+    , ul [class_ "todo-list"]
         (Prelude.map (renderTodo dispatch) todos)
-    , footer_ [class_ "todo-footer"]
-        [ text_ (show completedCount ++ " / " ++ show (Prelude.length todos) ++ " completed")
+    , footer [class_ "todo-footer"]
+        [ text (show completedCount ++ " / " ++ show (Prelude.length todos) ++ " completed")
         ]
     ]
 
 renderTodo :: Dispatch TodoAction -> Todo -> VNode
 renderTodo dispatch todo =
-  li_ [ class_ (if todoDone todo then "done" else "")
-       , onClick (\_ -> dispatch (ToggleTodo (todoId todo)))
-       ]
-    [ span_ [] [text_ (todoText todo)]
-    , button_ [onClick (\_ -> dispatch (RemoveTodo (todoId todo)))]
-        [text_ "x"]
+  li [ class_ (if todoDone todo then "done" else "")
+     , onClick (\_ -> dispatch (ToggleTodo (todoId todo)))
+     ]
+    [ span [] [text (todoText todo)]
+    , button [onClick (\_ -> dispatch (RemoveTodo (todoId todo)))]
+        ["x"]
     ]
 
 --------------------------------------------------------------------------------
@@ -113,12 +114,12 @@ todoAppWithAsync fetchTodos () = do
           let todosAsync = use fetchTodos
           -- In a real component, we'd bind this in do-notation.
           -- Showing the structure here:
-          in div_ [] [text_ "Todos loaded"]
+          in div [] ["Todos loaded"]
         else
-          div_ [] [text_ "Todos hidden"]
+          div [] ["Todos hidden"]
 
-  return $ div_ []
-    [ button_ [onClick (\_ -> setShowTodos (not showTodos))]
-        [text_ (if showTodos then "Hide" else "Show")]
+  return $ div []
+    [ button [onClick (\_ -> setShowTodos (not showTodos))]
+        [text (if showTodos then "Hide" else "Show")]
     , content
     ]

@@ -2,6 +2,12 @@
 
 -- | Virtual DOM types.
 --
+-- With @OverloadedStrings@, string literals can be used directly as 'VNode':
+--
+-- @
+-- h1 [] ["Hello, world!"]
+-- @
+--
 -- This is the target of component rendering: @Component : Props -> R(VDOM)@.
 -- The VDOM tree is then diffed against the previous tree, producing patches
 -- that are applied to the real DOM.
@@ -31,6 +37,7 @@ module MReact.VDOM
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.String (IsString(..))
 
 --------------------------------------------------------------------------------
 -- Types
@@ -78,6 +85,10 @@ instance Show VNode where
 -- | Eq instance uses structural equality (ignores event handlers).
 instance Eq VNode where
   (==) = vdomEq
+
+-- | String literals become 'VText' nodes with @OverloadedStrings@.
+instance IsString VNode where
+  fromString = VText
 
 --------------------------------------------------------------------------------
 -- Constructors

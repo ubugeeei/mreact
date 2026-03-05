@@ -12,6 +12,7 @@ The sole exception is `use` (React 19's Promise API), whose index is the monoid 
 
 ```haskell
 {-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 
 module MyComponent where
@@ -25,19 +26,18 @@ counter () = do
   let doubleCount   =  count * 2
   let parity        =  if even count then "even" else "odd" :: String
 
-  useEffect (deps count) $ do
+  useEffect (deps count) $
     putStrLn $ "Count: " ++ show count
-    pure (pure ())
 
-  return $ div_ [class_ "counter"]
-    [ p_  [] [text_ ("Count: " ++ show count)]
-    , p_  [] [text_ ("Double: " ++ show doubleCount)]
-    , p_  [] [text_ ("Parity: " ++ parity)]
-    , button_ [onClick (\_ -> setCount (count + 1))] [text_ "+"]
+  return $ div [class_ "counter"]
+    [ p  [] [text ("Count: " ++ show count)]
+    , p  [] [text ("Double: " ++ show doubleCount)]
+    , p  [] [text ("Parity: " ++ parity)]
+    , button [onClick (\_ -> setCount (count + 1))] ["+"]
     ]
 ```
 
-Import `MReact.Prelude` with `RebindableSyntax` to get indexed do-notation. The type signature `FC '[] '[ SEffect, SState Int] ()` reads right-to-left: one `useState Int`, then one `useEffect`.
+Import `MReact.Prelude` with `RebindableSyntax` and `OverloadedStrings` to get indexed do-notation and string-literal VNodes. The type signature `FC '[] '[ SEffect, SState Int] ()` reads right-to-left: one `useState Int`, then one `useEffect`.
 
 ## How it works
 
@@ -77,7 +77,7 @@ use :: Async a -> Hooks i i a   -- index unchanged!
 if showDetails
   then do
     details <- use fetchDetails   -- Hooks i i String
-    return (text_ details)        -- Hooks i i VNode
+    return (text details)         -- Hooks i i VNode
   else
     return nullElem               -- Hooks i i VNode
 ```
@@ -104,7 +104,9 @@ expensiveResult <- useMemo (deps items) (\() -> computeExpensive items)
 | `useReducer` | `SReducer s` | `i -> SReducer s ': i` |
 | `useRef` | `SRef a` | `i -> SRef a ': i` |
 | `useEffect` | `SEffect` | `i -> SEffect ': i` |
+| `useEffectWithCleanup` | `SEffect` | `i -> SEffect ': i` |
 | `useLayoutEffect` | `SLayoutEffect` | `i -> SLayoutEffect ': i` |
+| `useLayoutEffectWithCleanup` | `SLayoutEffect` | `i -> SLayoutEffect ': i` |
 | `useMemo` | `SMemo a` | `i -> SMemo a ': i` |
 | `useCallback` | `SCallback f` | `i -> SCallback f ': i` |
 | `useContext` | `SContext a` | `i -> SContext a ': i` |

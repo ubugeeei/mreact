@@ -1,4 +1,5 @@
 {-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 
 -- | Counter example — demonstrates useState and useEffect.
@@ -7,7 +8,6 @@ module Examples.Counter
   ) where
 
 import MReact.Prelude
-import qualified Prelude
 
 -- | A simple counter component.
 --
@@ -22,22 +22,21 @@ import qualified Prelude
 -- This is the idiomatic approach when the derivation is cheap.
 counterApp :: FC '[] '[ SEffect, SState Int] ()
 counterApp () = do
-  (count, setCount) <- useState (0 :: Int)
+  (count, setCount) <- useState 0
 
   let doubleCount   =  count * 2
 
-  let parity        =  if even count then "even" else "odd" :: String
+  let parity        =  if even count then "even" else "odd"
 
-  useEffect (deps count)
-    (Prelude.putStrLn ("Count changed to: " ++ show count)
-      Prelude.>> Prelude.pure (Prelude.pure ()))
+  useEffect (deps count) $
+    putStrLn ("Count changed to: " ++ show count)
 
-  return $ div_ [class_ "counter"]
-    [ h1_ [] [text_ "Counter"]
-    , p_  [] [text_ ("Count: " ++ show count)]
-    , p_  [] [text_ ("Double: " ++ show doubleCount)]
-    , p_  [] [text_ ("Parity: " ++ parity)]
-    , button_ [onClick (\_ -> setCount (count + 1))]   [text_ "+"]
-    , button_ [onClick (\_ -> setCount (count - 1))]   [text_ "-"]
-    , button_ [onClick (\_ -> setCount 0)]              [text_ "Reset"]
+  return $ div [class_ "counter"]
+    [ h1 [] ["Counter"]
+    , p  [] [text ("Count: " ++ show count)]
+    , p  [] [text ("Double: " ++ show doubleCount)]
+    , p  [] [text ("Parity: " ++ parity)]
+    , button [onClick (\_ -> setCount (count + 1))]   ["+"]
+    , button [onClick (\_ -> setCount (count - 1))]   ["-"]
+    , button [onClick (\_ -> setCount 0)]              ["Reset"]
     ]

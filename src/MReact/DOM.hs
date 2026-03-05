@@ -1,24 +1,20 @@
 -- | HTML element DSL — the JSX equivalent for MReact.
 --
 -- Provides smart constructors for all common HTML elements,
--- designed to feel like JSX when used with @RebindableSyntax@:
+-- designed to feel like JSX when used with @OverloadedStrings@:
 --
 -- @
--- -- JSX:
--- -- \<div className="app"\>
--- --   \<h1\>Hello\<\/h1\>
--- --   \<button onClick={handleClick}\>Click me\<\/button\>
--- -- \<\/div\>
---
--- -- MReact:
--- div_ [class_ "app"]
---   [ h1_ [] [text_ "Hello"]
---   , button_ [onClick handleClick] [text_ "Click me"]
+-- div [class_ "app"]
+--   [ h1 [] ["Hello"]
+--   , button [onClick handleClick] ["Click me"]
 --   ]
 -- @
 --
--- Elements follow the pattern: @tag_ :: [Prop] -> [VNode] -> VNode@
--- Void elements: @tag_ :: [Prop] -> VNode@
+-- Elements follow the pattern: @tag :: [Prop] -> [VNode] -> VNode@
+-- Void elements: @tag :: [Prop] -> VNode@
+--
+-- Props named @class_@, @type_@, and @id_@ keep the trailing underscore
+-- to avoid conflicts with Haskell keywords or Prelude.
 module MReact.DOM
   ( -- * Props
     Prop
@@ -26,24 +22,24 @@ module MReact.DOM
     -- * Attribute props
   , class_
   , id_
-  , style_
-  , href_
-  , src_
-  , alt_
+  , style
+  , href
+  , src
+  , alt
   , type_
-  , value_
-  , placeholder_
-  , disabled_
-  , checked_
-  , name_
-  , for_
-  , role_
-  , tabIndex_
-  , title_
-  , ariaLabel_
-  , ariaLabelledBy_
-  , dataAttr_
-  , attr_
+  , value
+  , placeholder
+  , disabled
+  , checked
+  , name
+  , for
+  , role
+  , tabIndex
+  , title
+  , ariaLabel
+  , ariaLabelledBy
+  , dataAttr
+  , attr
     -- * Event props
   , onClick
   , onDoubleClick
@@ -61,61 +57,63 @@ module MReact.DOM
   , onMouseUp
   , onEvent
     -- * Key prop
-  , key_
+  , key
+    -- * Text
+  , text
     -- * Layout elements
-  , div_
-  , span_
-  , p_
-  , section_
-  , article_
-  , aside_
-  , header_
-  , footer_
-  , main_
-  , nav_
+  , div
+  , span
+  , p
+  , section
+  , article
+  , aside
+  , header
+  , footer
+  , main
+  , nav
     -- * Heading elements
-  , h1_
-  , h2_
-  , h3_
-  , h4_
-  , h5_
-  , h6_
+  , h1
+  , h2
+  , h3
+  , h4
+  , h5
+  , h6
     -- * Text elements
-  , text_
-  , em_
-  , strong_
-  , code_
-  , pre_
-  , blockquote_
+  , em
+  , strong
+  , code
+  , pre
+  , blockquote
     -- * List elements
-  , ul_
-  , ol_
-  , li_
+  , ul
+  , ol
+  , li
     -- * Table elements
-  , table_
-  , thead_
-  , tbody_
-  , tr_
-  , th_
-  , td_
+  , table
+  , thead
+  , tbody
+  , tr
+  , th
+  , td
     -- * Form elements
-  , form_
-  , label_
-  , input_
-  , textarea_
-  , select_
-  , option_
-  , button_
+  , form
+  , label
+  , input
+  , textarea
+  , select
+  , option
+  , button
     -- * Media elements
-  , img_
-  , a_
+  , img
+  , a
     -- * Fragment & null
-  , fragment_
+  , fragment
   , nullElem
     -- * Keyed list helper
-  , keyedList_
+  , keyedList
   ) where
 
+import Prelude hiding (div, span, id, head, map, pred)
 import qualified Data.Map.Strict as Map
 import MReact.VDOM
 
@@ -147,61 +145,61 @@ class_ = AttrProp "class"
 id_ :: String -> Prop
 id_ = AttrProp "id"
 
-style_ :: String -> Prop
-style_ = AttrProp "style"
+style :: String -> Prop
+style = AttrProp "style"
 
-href_ :: String -> Prop
-href_ = AttrProp "href"
+href :: String -> Prop
+href = AttrProp "href"
 
-src_ :: String -> Prop
-src_ = AttrProp "src"
+src :: String -> Prop
+src = AttrProp "src"
 
-alt_ :: String -> Prop
-alt_ = AttrProp "alt"
+alt :: String -> Prop
+alt = AttrProp "alt"
 
 type_ :: String -> Prop
 type_ = AttrProp "type"
 
-value_ :: String -> Prop
-value_ = AttrProp "value"
+value :: String -> Prop
+value = AttrProp "value"
 
-placeholder_ :: String -> Prop
-placeholder_ = AttrProp "placeholder"
+placeholder :: String -> Prop
+placeholder = AttrProp "placeholder"
 
-disabled_ :: Bool -> Prop
-disabled_ True  = AttrProp "disabled" "disabled"
-disabled_ False = AttrProp "disabled" ""
+disabled :: Bool -> Prop
+disabled True  = AttrProp "disabled" "disabled"
+disabled False = AttrProp "disabled" ""
 
-checked_ :: Bool -> Prop
-checked_ True  = AttrProp "checked" "checked"
-checked_ False = AttrProp "checked" ""
+checked :: Bool -> Prop
+checked True  = AttrProp "checked" "checked"
+checked False = AttrProp "checked" ""
 
-name_ :: String -> Prop
-name_ = AttrProp "name"
+name :: String -> Prop
+name = AttrProp "name"
 
-for_ :: String -> Prop
-for_ = AttrProp "for"
+for :: String -> Prop
+for = AttrProp "for"
 
-role_ :: String -> Prop
-role_ = AttrProp "role"
+role :: String -> Prop
+role = AttrProp "role"
 
-tabIndex_ :: Int -> Prop
-tabIndex_ = AttrProp "tabindex" . show
+tabIndex :: Int -> Prop
+tabIndex = AttrProp "tabindex" . show
 
-title_ :: String -> Prop
-title_ = AttrProp "title"
+title :: String -> Prop
+title = AttrProp "title"
 
-ariaLabel_ :: String -> Prop
-ariaLabel_ = AttrProp "aria-label"
+ariaLabel :: String -> Prop
+ariaLabel = AttrProp "aria-label"
 
-ariaLabelledBy_ :: String -> Prop
-ariaLabelledBy_ = AttrProp "aria-labelledby"
+ariaLabelledBy :: String -> Prop
+ariaLabelledBy = AttrProp "aria-labelledby"
 
-dataAttr_ :: String -> String -> Prop
-dataAttr_ k = AttrProp ("data-" ++ k)
+dataAttr :: String -> String -> Prop
+dataAttr k = AttrProp ("data-" ++ k)
 
-attr_ :: String -> String -> Prop
-attr_ = AttrProp
+attr :: String -> String -> Prop
+attr = AttrProp
 
 --------------------------------------------------------------------------------
 -- Event props
@@ -253,14 +251,26 @@ onEvent :: EventName -> EventHandler -> Prop
 onEvent = EventProp
 
 -- | Key prop for list reconciliation.
-key_ :: Key -> Prop
-key_ = KeyProp
+key :: Key -> Prop
+key = KeyProp
+
+--------------------------------------------------------------------------------
+-- Text helper
+--------------------------------------------------------------------------------
+
+-- | Create a text node from a dynamic string.
+--
+-- For string literals, use @OverloadedStrings@ instead:
+--
+-- @
+-- h1 [] ["Hello"]                          -- string literal
+-- p  [] [text ("Count: " ++ show count)]   -- dynamic string
+-- @
+text :: String -> VNode
+text = VText
 
 --------------------------------------------------------------------------------
 -- Element helpers
---
--- Pattern: tag_ :: [Prop] -> [VNode] -> VNode
--- The [Prop] list is partitioned into attributes and event handlers.
 --------------------------------------------------------------------------------
 
 mkElement :: String -> [Prop] -> [VNode] -> VNode
@@ -274,135 +284,132 @@ mkVoid tag props =
   in VElement tag attrs events []
 
 -- Layout
-div_ :: [Prop] -> [VNode] -> VNode
-div_ = mkElement "div"
+div :: [Prop] -> [VNode] -> VNode
+div = mkElement "div"
 
-span_ :: [Prop] -> [VNode] -> VNode
-span_ = mkElement "span"
+span :: [Prop] -> [VNode] -> VNode
+span = mkElement "span"
 
-p_ :: [Prop] -> [VNode] -> VNode
-p_ = mkElement "p"
+p :: [Prop] -> [VNode] -> VNode
+p = mkElement "p"
 
-section_ :: [Prop] -> [VNode] -> VNode
-section_ = mkElement "section"
+section :: [Prop] -> [VNode] -> VNode
+section = mkElement "section"
 
-article_ :: [Prop] -> [VNode] -> VNode
-article_ = mkElement "article"
+article :: [Prop] -> [VNode] -> VNode
+article = mkElement "article"
 
-aside_ :: [Prop] -> [VNode] -> VNode
-aside_ = mkElement "aside"
+aside :: [Prop] -> [VNode] -> VNode
+aside = mkElement "aside"
 
-header_ :: [Prop] -> [VNode] -> VNode
-header_ = mkElement "header"
+header :: [Prop] -> [VNode] -> VNode
+header = mkElement "header"
 
-footer_ :: [Prop] -> [VNode] -> VNode
-footer_ = mkElement "footer"
+footer :: [Prop] -> [VNode] -> VNode
+footer = mkElement "footer"
 
-main_ :: [Prop] -> [VNode] -> VNode
-main_ = mkElement "main"
+main :: [Prop] -> [VNode] -> VNode
+main = mkElement "main"
 
-nav_ :: [Prop] -> [VNode] -> VNode
-nav_ = mkElement "nav"
+nav :: [Prop] -> [VNode] -> VNode
+nav = mkElement "nav"
 
 -- Headings
-h1_ :: [Prop] -> [VNode] -> VNode
-h1_ = mkElement "h1"
+h1 :: [Prop] -> [VNode] -> VNode
+h1 = mkElement "h1"
 
-h2_ :: [Prop] -> [VNode] -> VNode
-h2_ = mkElement "h2"
+h2 :: [Prop] -> [VNode] -> VNode
+h2 = mkElement "h2"
 
-h3_ :: [Prop] -> [VNode] -> VNode
-h3_ = mkElement "h3"
+h3 :: [Prop] -> [VNode] -> VNode
+h3 = mkElement "h3"
 
-h4_ :: [Prop] -> [VNode] -> VNode
-h4_ = mkElement "h4"
+h4 :: [Prop] -> [VNode] -> VNode
+h4 = mkElement "h4"
 
-h5_ :: [Prop] -> [VNode] -> VNode
-h5_ = mkElement "h5"
+h5 :: [Prop] -> [VNode] -> VNode
+h5 = mkElement "h5"
 
-h6_ :: [Prop] -> [VNode] -> VNode
-h6_ = mkElement "h6"
+h6 :: [Prop] -> [VNode] -> VNode
+h6 = mkElement "h6"
 
 -- Text
-text_ :: String -> VNode
-text_ = VText
+em :: [Prop] -> [VNode] -> VNode
+em = mkElement "em"
 
-em_ :: [Prop] -> [VNode] -> VNode
-em_ = mkElement "em"
+strong :: [Prop] -> [VNode] -> VNode
+strong = mkElement "strong"
 
-strong_ :: [Prop] -> [VNode] -> VNode
-strong_ = mkElement "strong"
+code :: [Prop] -> [VNode] -> VNode
+code = mkElement "code"
 
-code_ :: [Prop] -> [VNode] -> VNode
-code_ = mkElement "code"
+pre :: [Prop] -> [VNode] -> VNode
+pre = mkElement "pre"
 
-pre_ :: [Prop] -> [VNode] -> VNode
-pre_ = mkElement "pre"
-
-blockquote_ :: [Prop] -> [VNode] -> VNode
-blockquote_ = mkElement "blockquote"
+blockquote :: [Prop] -> [VNode] -> VNode
+blockquote = mkElement "blockquote"
 
 -- Lists
-ul_ :: [Prop] -> [VNode] -> VNode
-ul_ = mkElement "ul"
+ul :: [Prop] -> [VNode] -> VNode
+ul = mkElement "ul"
 
-ol_ :: [Prop] -> [VNode] -> VNode
-ol_ = mkElement "ol"
+ol :: [Prop] -> [VNode] -> VNode
+ol = mkElement "ol"
 
-li_ :: [Prop] -> [VNode] -> VNode
-li_ = mkElement "li"
+li :: [Prop] -> [VNode] -> VNode
+li = mkElement "li"
 
 -- Tables
-table_ :: [Prop] -> [VNode] -> VNode
-table_ = mkElement "table"
+table :: [Prop] -> [VNode] -> VNode
+table = mkElement "table"
 
-thead_ :: [Prop] -> [VNode] -> VNode
-thead_ = mkElement "thead"
+thead :: [Prop] -> [VNode] -> VNode
+thead = mkElement "thead"
 
-tbody_ :: [Prop] -> [VNode] -> VNode
-tbody_ = mkElement "tbody"
+tbody :: [Prop] -> [VNode] -> VNode
+tbody = mkElement "tbody"
 
-tr_ :: [Prop] -> [VNode] -> VNode
-tr_ = mkElement "tr"
+tr :: [Prop] -> [VNode] -> VNode
+tr = mkElement "tr"
 
-th_ :: [Prop] -> [VNode] -> VNode
-th_ = mkElement "th"
+th :: [Prop] -> [VNode] -> VNode
+th = mkElement "th"
 
-td_ :: [Prop] -> [VNode] -> VNode
-td_ = mkElement "td"
+td :: [Prop] -> [VNode] -> VNode
+td = mkElement "td"
 
 -- Forms
-form_ :: [Prop] -> [VNode] -> VNode
-form_ = mkElement "form"
+form :: [Prop] -> [VNode] -> VNode
+form = mkElement "form"
 
-label_ :: [Prop] -> [VNode] -> VNode
-label_ = mkElement "label"
+label :: [Prop] -> [VNode] -> VNode
+label = mkElement "label"
 
-input_ :: [Prop] -> VNode
-input_ = mkVoid "input"
+input :: [Prop] -> VNode
+input = mkVoid "input"
 
-textarea_ :: [Prop] -> [VNode] -> VNode
-textarea_ = mkElement "textarea"
+textarea :: [Prop] -> [VNode] -> VNode
+textarea = mkElement "textarea"
 
-select_ :: [Prop] -> [VNode] -> VNode
-select_ = mkElement "select"
+select :: [Prop] -> [VNode] -> VNode
+select = mkElement "select"
 
-option_ :: [Prop] -> [VNode] -> VNode
-option_ = mkElement "option"
+option :: [Prop] -> [VNode] -> VNode
+option = mkElement "option"
 
-button_ :: [Prop] -> [VNode] -> VNode
-button_ = mkElement "button"
+button :: [Prop] -> [VNode] -> VNode
+button = mkElement "button"
 
 -- Media / links
-img_ :: [Prop] -> VNode
-img_ = mkVoid "img"
+img :: [Prop] -> VNode
+img = mkVoid "img"
 
-a_ :: [Prop] -> [VNode] -> VNode
-a_ = mkElement "a"
+a :: [Prop] -> [VNode] -> VNode
+a = mkElement "a"
 
 -- Fragment & null
-fragment_ :: [VNode] -> VNode
-fragment_ = VFragment
+fragment :: [VNode] -> VNode
+fragment = VFragment
 
 nullElem :: VNode
 nullElem = VNull
@@ -410,9 +417,9 @@ nullElem = VNull
 -- | Helper for rendering keyed lists (like mapping over arrays in JSX).
 --
 -- @
--- keyedList_ "ul" [] (map (\\item -> (itemId item, li_ [] [text_ (itemName item)])) items)
+-- keyedList "ul" [] (map (\\item -> (itemId item, li [] [text (itemName item)])) items)
 -- @
-keyedList_ :: String -> [Prop] -> [(Key, VNode)] -> VNode
-keyedList_ tag props items =
+keyedList :: String -> [Prop] -> [(Key, VNode)] -> VNode
+keyedList tag props items =
   let (attrs, events, _) = toAttrsAndEvents props
   in VKeyed tag attrs events items
