@@ -207,27 +207,21 @@ with the idempotency property `u_s . u_s = u_s`.
 
 ## Setup
 
-Requires [mise](https://mise.jdx.dev/) for environment management.
+Requires [Nix](https://nixos.org/) for the development environment and a global
+`vp` for Vite Task. Task definitions live in `package.json` scripts; there are
+no local JavaScript dependencies to install.
 
 ```bash
-mise install        # installs ghcup + node
-mise run build      # cabal build
+nix develop
+vp run build        # cabal build
 ```
 
-GHC and Cabal are managed via ghcup. The project is tested with GHC 9.6.
+GHC and Cabal are provided by Nix. The project is tested with GHC 9.6.
 
-### Dev server (SSR demo)
-
-```bash
-mise run dev        # build, generate index.html, serve on localhost:3000
-```
-
-This runs the Haskell SSR pipeline (`renderToString`) to generate `index.html`, then serves it locally.
-
-### SSR only (no server)
+### Runtime demo
 
 ```bash
-mise run ssr        # prints SSR output to stdout
+vp run dev          # build, then run the runtime pipeline demo
 ```
 
 ### GHCJS (browser, client-side)
