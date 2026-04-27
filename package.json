@@ -1,0 +1,10 @@
+{
+  "name": "mreact",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "build": "cabal build",
+    "ci": "cabal update && vp run build",
+    "dev": "vp run build && cabal run mreact-demo"
+  }
+}
